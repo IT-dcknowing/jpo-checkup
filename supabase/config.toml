@@ -18,8 +18,8 @@ file_size_limit = "20MiB"
 [auth]
 enabled = true
 # Lien provisoire (Vercel) ; ajouter le domaine définitif dans additional_redirect_urls le moment venu
-site_url = "https://jpo-checkup.vercel.app"
-additional_redirect_urls = ["https://jpo-checkup.vercel.app/**", "http://localhost:8000/**", "http://localhost:3000/**"]
+site_url = "https://jpo-checkup-itdcknowing-5466s-projects.vercel.app"
+additional_redirect_urls = ["https://jpo-checkup-itdcknowing-5466s-projects.vercel.app/**", "http://localhost:8000/**", "http://localhost:3000/**"]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 enable_signup = true

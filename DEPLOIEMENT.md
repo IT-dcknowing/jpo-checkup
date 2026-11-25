@@ -25,9 +25,9 @@ Migrations appliquées sur le projet `hhzwzoantzhgtsbrtswr` :
 Ces réglages ne sont pas accessibles par le connecteur (MCP). Tableau de bord : https://supabase.com/dashboard/project/hhzwzoantzhgtsbrtswr
 
 ### 2.1 URLs — *Authentication > URL Configuration*
-- **Site URL** : `https://jpo-checkup.vercel.app`
+- **Site URL** : `https://jpo-checkup-itdcknowing-5466s-projects.vercel.app`
 - **Redirect URLs** (bouton *Add URL*, une par ligne) :
-  - `https://jpo-checkup.vercel.app/**`
+  - `https://jpo-checkup-itdcknowing-5466s-projects.vercel.app/**`
   - `http://localhost:8000/**`
   - `http://localhost:3000/**`
   - plus tard, le domaine définitif : `https://<domaine-definitif>/**` (puis remplacer la Site URL)
@@ -70,7 +70,7 @@ C'est cette clé (et pas une `sb_secret_...`) que l'Edge Function reconnaît pou
 - `RESEND_API_KEY` : clé API Resend (obligatoire)
 - `MAIL_FROM` : `DC-KNOWING · Diagnostic JPO <diagnostic@dc-knowing.com>`
 - `MAIL_COPY_TO` : copie interne aux conseillers (facultatif, adresses séparées par des virgules)
-- `PUBLIC_SITE_URL` : `https://jpo-checkup.vercel.app`
+- `PUBLIC_SITE_URL` : `https://jpo-checkup-itdcknowing-5466s-projects.vercel.app`
 
 ## 4. Vercel — variables d'environnement
 *Project jpo-checkup > Settings > Environment Variables* (Production et Preview), voir `.env.example` :
