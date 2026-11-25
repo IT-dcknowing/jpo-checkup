@@ -22,7 +22,7 @@ class Component extends DCLogic {
       FNE: [['ACTIVE', 'Activée'], ['EN_COURS_ACTIVATION', 'Activation en cours'], ['NON_ACTIVE', 'Non activée'], ['NE_SAIT_PAS', 'Je ne sais pas']],
       STAT: [['A_JOUR', 'À jour'], ['EN_RETARD', 'En retard'], ['NE_SAIT_PAS', 'Ne sait pas']],
       OBL: [['DGI', 'Déclarations fiscales'], ['CNPS', 'Cotisations sociales'], ['ITS', 'Impôt sur traitements et salaires'], ['CMU', 'Couverture maladie universelle'], ['DISA', 'Déclaration individuelle des salaires annuels']],
-      DOCS: [['balance', 'Balance générale', 'Le plus complet : il suffit souvent à lui seul.', true], ['cr', 'Compte de résultat', 'Chiffre d’affaires, achats, charges et résultat.', false], ['bilan', 'Bilan', 'Actif, passif, trésorerie et dettes.', false], ['autre', 'Autre document', 'Grand livre, journal ou déclarations.', false]],
+      DOCS: [['balance', 'Balance générale', 'Le plus complet : il suffit souvent à lui seul.', true], ['cr', 'Compte de résultat', 'Chiffre d’affaires, achats, charges et résultat.', false], ['bilan', 'Bilan', 'Actif, passif, trésorerie et dettes.', false], ['autre', 'Autre document', 'Complément facultatif (déclarations, grand livre) : ne remplace pas la balance.', false]],
       STEPS: [
         ['Entreprise', 'Votre entreprise', 'Ces informations identifient le dossier et choisissent les repères adaptés à votre secteur.'],
         ['Vous', 'Vous et votre visite', 'Pour vous rappeler si besoin et préparer votre invitation au bon jour.'],
@@ -254,8 +254,8 @@ class Component extends DCLogic {
         return patch;
       });
       if (ev.etape === 'ERREUR') {
-        this.setState({ failed: true });
-        this.toast('bad', 'Lecture impossible', 'Un conseiller va vous rappeler.');
+        this.setState({ failed: true, failMsg: ev.message || '' });
+        this.toast('bad', 'Diagnostic interrompu', 'Un conseiller va vous rappeler.');
         this.refreshDiags();
       }
       if (ev.etape === 'ENVOYE') {
@@ -401,7 +401,7 @@ class Component extends DCLogic {
       stepPct: Math.round((s.step - 1) / 6 * 100 + 8),
       canBack: s.step > 1, noBack: s.step === 1, isLast: s.step === 6, notLast: s.step < 6,
       fileCount: fileList.length, fileCountCls: full ? 'b-acc' : fileList.length ? 'b-ok' : '',
-      failed: s.failed, allDone: s.done && s.screen === 'suivi', elapsedL: this.fmtT(elapsedSec), remainL,
+      failed: s.failed, failMsg: s.failMsg || 'Votre diagnostic n’a pas pu être produit automatiquement.', allDone: s.done && s.screen === 'suivi', elapsedL: this.fmtT(elapsedSec), remainL,
       barCls: running ? 'stripes' : '', barColor: s.failed ? '#DC2626' : s.done ? '#15803D' : '#FFD700',
       job: s.job, entreprise: f.raison || 'Votre entreprise', emailShown: userEmail || 'votre adresse e-mail', telShown: f.tel || 'votre numéro',
       count: s.count, confetti: s.confetti,

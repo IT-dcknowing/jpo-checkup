@@ -212,3 +212,29 @@ def test_admin_flow(client, tok):
 def test_meta(client):
     m = client.get("/api/meta").json()
     assert m["fichiers_max"] == 3 and m["taille_max_mo"] == 20
+
+
+def test_documents_without_financial_statements_get_a_clear_message(settings):
+    """Journaux de ventes / achats / paie : aucun poste reconnu -> message dédié, pas « illisible »."""
+    import copy
+    vide = copy.deepcopy(FakeLLM().payload)
+
+    def videz(x):
+        if isinstance(x, dict):
+            if "valeur" in x and "confiance" in x:
+                x["valeur"], x["confiance"] = "NON_DISPONIBLE", 0.0
+            for v in x.values():
+                videz(v)
+    videz(vide["compte_resultat"]), videz(vide["bilan"])
+    vide["meta"]["confidence_global"] = 0.15
+    sb = FakeSupabase()
+    with TestClient(create_app(settings, llm=FakeLLM(payload=vide), sb=sb)) as c:
+        c.sb = sb
+        tok = sb.add_user("x@exemple.ci")
+        job_id = depot(c, tok).json()["job_id"]
+        v = traiter(c, tok, job_id)
+        assert v["statut"] == "ERREUR" and "balance générale" in v["message"] and "journaux" in v["message"]
+        assert sb.tables["rapports"][0]["erreur"].startswith("documents non reconnus")
+        assert any(b.get("motif") == "non_reconnu" for _, b, _ in sb.invocations)
+        j = c.get(f"/api/diagnostics/{job_id}/journal", headers=auth(tok)).json()
+        assert all("t" in e for e in j["evenements"])  # horodatage pour l'historique conseiller

@@ -158,14 +158,20 @@ Deno.serve(async (req) => {
   const nom = String((rapport.formulaire as Record<string, unknown>)?.contact_nom ?? "");
 
   if (type === "excuse") {
+    const nonReconnu = body.motif === "non_reconnu";
+    const raison = nonReconnu
+      ? "Les fichiers déposés ne contiennent pas les états financiers nécessaires au diagnostic : il se calcule à partir de la balance générale (idéal), du compte de résultat ou du bilan. Les journaux de ventes, d'achats ou de paie ne suffisent pas."
+      : body.motif === "technique"
+        ? "Votre diagnostic n'a pas pu être produit automatiquement à la suite d'un incident technique."
+        : "Nous vous prions de nous excuser : les documents déposés n'ont pas pu être lus de façon assez fiable pour produire un rapport automatique.";
     try {
       await envoyer(rapport.email, "Votre diagnostic — un conseiller vous rappelle",
-        page(["Bonjour,", "Nous vous prions de nous excuser : les documents déposés n'ont pas pu être lus de façon assez fiable pour produire un rapport automatique.",
+        page(["Bonjour,", esc(raison),
           "Plutôt que de vous envoyer des chiffres incertains, un conseiller vous rappelle dans la journée pour reprendre votre diagnostic avec vous.",
           `Si vous êtes encore au salon, passez au stand Check-up 360 (siège DC-KNOWING, ${esc(ADRESSE)}) avec une version numérique de votre balance générale.`,
           "<b>Astuce :</b> les fichiers CSV ou XLSX exportés de votre logiciel comptable sont lus plus vite et plus sûrement qu'un PDF numérisé."],
           undefined, `Référence ${rapport.reference}. Vos fichiers bruts sont supprimés sous 24 h.`),
-        `Bonjour,\n\nNous vous prions de nous excuser : les documents déposés n'ont pas pu être lus de façon assez fiable pour produire un rapport automatique.\nUn conseiller vous rappelle dans la journée.\n\nRéférence ${rapport.reference}\n\n${PIED}\n`,
+        `Bonjour,\n\n${raison}\nUn conseiller vous rappelle dans la journée.\n\nRéférence ${rapport.reference}\n\n${PIED}\n`,
         [], true);
       return json(200, { ok: true });
     } catch (e) {

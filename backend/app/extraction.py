@@ -18,6 +18,10 @@ class LectureImpossible(Exception):
     """Données trop pauvres pour produire un rapport fiable (spec §16)."""
 
 
+class DocumentsNonReconnus(LectureImpossible):
+    """Aucun chiffre d'état financier reconnu : les fichiers ne sont pas une balance, un compte de résultat ou un bilan."""
+
+
 def _schema_example() -> str:
     champ = '{"valeur": 0 ou "NON_DISPONIBLE", "confiance": 0.0, "sources": "comptes ou colonnes utilisés"}'
     def bloc(fields): return "{" + ", ".join(f'"{f}": {champ}' for f in fields) + "}"
@@ -118,7 +122,9 @@ def finalize(out: IAOutput, form: DepotForm, modele: str, extra_warnings: list[s
     meta["confidence_global"] = conf
     meta["warnings"] = warnings
 
-    if not lus or conf < CONF_GLOBAL_ECHEC:
+    if not lus:
+        raise DocumentsNonReconnus(f"aucun poste de balance, de compte de résultat ou de bilan reconnu (confiance {conf:.2f}, 0 champ lu)")
+    if conf < CONF_GLOBAL_ECHEC:
         raise LectureImpossible(f"lecture trop incertaine (confiance {conf:.2f}, {len(lus)} champs lus)")
     return Extraction(ia=ia, couverture_pct=couverture, confiance_globale=conf, lecture_partielle=conf < CONF_GLOBAL_PARTIEL,
                       warnings=warnings, modele=modele)

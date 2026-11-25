@@ -11,7 +11,7 @@ from . import report
 from .anonymize import anonymize
 from .config import Settings
 from .db import TERMINAUX, Database, now_iso
-from .extraction import Extraction, LectureImpossible, extract
+from .extraction import DocumentsNonReconnus, Extraction, LectureImpossible, extract
 from .llm import LLMClient, LLMError
 from .readers import ReaderError, read_file
 from .schemas import ND, DepotForm
@@ -24,6 +24,9 @@ FRONT_ETAPE = {"EN_ATTENTE": "EN_ATTENTE", "LECTURE": "LECTURE", "MAPPING_IA": "
                "ENVOYE": "ENVOYE", "TERMINE": "ENVOYE", "ERREUR": "ERREUR"}
 TYPES_FICHIERS = {"balance": "balance générale", "cr": "compte de résultat", "bilan": "bilan", "autre": "autre document"}
 MSG_PUBLIC_LECTURE = "Rapport automatique annulé : vos documents n'ont pas pu être lus de façon fiable. Un conseiller DC-KNOWING vous rappelle pour réaliser votre diagnostic avec vous."
+MSG_PUBLIC_NON_RECONNU = ("Vos fichiers ne contiennent pas les états financiers attendus : le diagnostic se calcule à partir de la balance générale "
+                          "(idéal), du compte de résultat ou du bilan. Les journaux (ventes, achats, paie) ne suffisent pas. "
+                          "Déposez ces documents ou un conseiller DC-KNOWING vous rappelle pour le faire avec vous.")
 MSG_PUBLIC_TECH = "Votre diagnostic n'a pas pu être produit automatiquement. Un conseiller DC-KNOWING vous rappelle très vite."
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 EXT_LECTURE = {".csv", ".xlsx", ".pdf"}
@@ -69,7 +72,8 @@ class Pipeline:
     # ------------------------------------------------------------------ utilitaires
     def _log(self, job_id: str, statut: str, pct: int, message: str, niveau: str = "", etape: str | None = None) -> None:
         """Change d'étape et ajoute un événement au journal, relu par l'écran de suivi du front."""
-        self.db.log_event(job_id, statut, pct, {"etape": etape or FRONT_ETAPE[statut], "progression": pct, "message": message, "niveau": niveau})
+        self.db.log_event(job_id, statut, pct, {"etape": etape or FRONT_ETAPE[statut], "progression": pct, "message": message, "niveau": niveau,
+                                                 "t": now_iso()})
 
     def _purge_uploads(self, job_id: str) -> None:
         """Les fichiers bruts ne servent plus après l'analyse : supprimés du stockage (la ligne documents reste comme trace)."""
@@ -87,8 +91,10 @@ class Pipeline:
         form = DepotForm.model_validate(job["form"])
         try:
             self._run(job, form, user_token)
+        except DocumentsNonReconnus as e:
+            self._fail(job, f"documents non reconnus : {e}", MSG_PUBLIC_NON_RECONNU, user_token, motif="non_reconnu")
         except LectureImpossible as e:
-            self._fail(job, str(e), MSG_PUBLIC_LECTURE, user_token)
+            self._fail(job, str(e), MSG_PUBLIC_LECTURE, user_token, motif="illisible")
         except ReaderError as e:
             self._fail(job, f"fichier illisible : {e}", MSG_PUBLIC_LECTURE, user_token)
         except LLMError as e:
@@ -106,12 +112,12 @@ class Pipeline:
             except Exception:  # noqa: BLE001
                 log.exception("job %s : verrou non libéré", job_id)
 
-    def _fail(self, job: dict, detail: str, public: str, user_token: str | None) -> None:
+    def _fail(self, job: dict, detail: str, public: str, user_token: str | None, motif: str = "technique") -> None:
         pct = (self.db.get_job(job["id"]) or job)["progression"]
         self.db.update_job(job["id"], erreur=detail[:1500], erreur_publique=public, completed_at=now_iso())
         self._log(job["id"], "ERREUR", pct, public, "erreur")
         try:  # e-mail d'excuse (le conseiller est en copie)
-            self.sb.invoke("envoyer-rapport", {"rapport_id": job["id"], "type": "excuse"}, user_token)
+            self.sb.invoke("envoyer-rapport", {"rapport_id": job["id"], "type": "excuse", "motif": motif}, user_token)
         except Exception:  # noqa: BLE001
             log.exception("job %s : e-mail d'excuse non envoyé", job["id"])
 

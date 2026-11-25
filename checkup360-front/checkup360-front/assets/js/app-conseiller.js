@@ -50,14 +50,21 @@ class Component extends DCLogic {
       ent: d.entretien_realise ? 'Fait' : d.rappel_effectue ? 'Rappelé' : (d.entretien || null), indicatif: !!d.indicatif,
       alertes: (d.alertes || []).map((a) => Array.isArray(a) ? a : [niv[(a.niveau || '').toLowerCase()] || a.niveau || 'Info', a.texte || a.message || '']),
       plan: (d.plan_action || []).map((p) => Array.isArray(p) ? p : [p.priorite || p.prio, p.action, mod(p.module || p.outil)]),
-      errMsg: d.erreur || null
+      errMsg: d.erreur || null, journal: d.journal || null, auditApi: d.audit || null
     };
+  }
+  /* Ouvre le détail : journal et audit réels lus sur l'API */
+  openJob(id) {
+    this.setState({ selId: id });
+    if (MOCK) return;
+    API.admin.detail(id).then((d) => this.setState((st) => ({ jobs: st.jobs.map((j) => (j.id === id ? { ...j, journal: d.journal || [], auditApi: d.audit || [], errMsg: d.erreur || j.errMsg } : j)) })))
+      .catch((err) => this.toast('bad', 'Détail indisponible', err.message));
   }
   load() {
     if (MOCK) return;
     const day = { '16': '2026-12-16', '17': '2026-12-17', '18': '2026-12-18' }[this.state.day];
     this.setState({ loading: true });
-    API.admin.list(day).then((r) => this.setState({ jobs: (r.items || r || []).map((d) => this.fromApi(d)), loading: false })).catch((e) => {
+    API.admin.list(day).then((r) => this.setState((st) => ({ jobs: (r.items || r || []).map((d) => { const n = this.fromApi(d); const old = st.jobs.find((x) => x.id === n.id); return old && old.journal ? { ...n, journal: old.journal, auditApi: old.auditApi } : n; }), loading: false }), () => { if (this.state.selId) this.openJob(this.state.selId); })).catch((e) => {
       this.setState({ loading: false });
       if (e.status === 401) { API.admin.logout(); this.setState({ logged: false, loginErr: 'Session expirée : reconnectez-vous.' }); }
       else this.toast('bad', 'Chargement impossible', e.message);
@@ -110,8 +117,10 @@ class Component extends DCLogic {
     const idx = j.statut === 'ERREUR' ? 1 : this.FLOW.indexOf(j.statut);
     const [hh, mm] = j.heure.split(':').map(Number);
     const tAt = (k) => { const t = hh * 60 + mm + k; return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
-    const hist = this.FLOW.slice(0, Math.max(1, idx + 1)).map((st, k) => ({ t: tAt(k), l: this.STL[st], c: k === idx && run ? '#FFD700' : '#000000' }));
-    if (j.statut === 'ERREUR') hist.push({ t: tAt(2), l: 'Erreur : ' + (j.errMsg || 'lecture impossible'), c: '#DC2626' });
+    const hm = (iso) => { if (!iso) return '--:--'; const d = new Date(iso); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+    const real = !MOCK;
+    const hist = real ? (j.journal || []).map((ev) => ({ t: hm(ev.t), l: ev.message, c: ev.niveau === 'erreur' ? '#DC2626' : ev.niveau === 'ok' ? '#15803D' : '#000000' })) : this.FLOW.slice(0, Math.max(1, idx + 1)).map((st, k) => ({ t: tAt(k), l: this.STL[st], c: k === idx && run ? '#FFD700' : '#000000' }));
+    if (!real && j.statut === 'ERREUR') hist.push({ t: tAt(2), l: 'Erreur : ' + (j.errMsg || 'lecture impossible'), c: '#DC2626' });
     if (j.ent === 'Fait') hist.push({ t: tAt(40), l: 'Entretien réalisé', c: '#15803D' });
     return {
       ...j, typeL, typeCls, stCls, stL: this.STL[j.statut], running: run, prog,
@@ -127,7 +136,7 @@ class Component extends DCLogic {
       plan: (j.plan || []).map(([prio, a, m]) => ({ prio, a, cls: prioCls[prio], mod: 'p-' + m, modL: modL[m] })),
       hasAlerts: (j.alertes || []).length > 0, hasPlan: (j.plan || []).length > 0,
       hist,
-      audit: [tAt(0) + ' · système · dépôt reçu (empreinte SHA-256)', tAt(1) + ' · worker · fichiers lus en conteneur isolé'].concat(j.statut === 'ENVOYE' ? [tAt(6) + ' · système · PDF stocké chiffré, e-mail envoyé'] : []),
+      audit: real ? (j.auditApi || []).map((a) => hm(a.horodatage) + ' · ' + a.acteur + ' · ' + a.action) : [tAt(0) + ' · système · dépôt reçu (empreinte SHA-256)', tAt(1) + ' · worker · fichiers lus en conteneur isolé'].concat(j.statut === 'ENVOYE' ? [tAt(6) + ' · système · PDF stocké chiffré, e-mail envoyé'] : []),
       openL: 'Voir le détail de ' + j.nom
     };
   }
@@ -143,7 +152,7 @@ class Component extends DCLogic {
       if (s.filter === 'err') return j.statut === 'ERREUR';
       return true;
     };
-    const rows = dayJobs.filter(match).sort((a, b) => b.heure.localeCompare(a.heure)).map((j) => ({ ...this.decorate(j), trCls: (s.selId === j.id ? 'sel ' : '') + (s.newId === j.id ? 'new' : ''), open: () => this.setState({ selId: j.id }) }));
+    const rows = dayJobs.filter(match).sort((a, b) => b.heure.localeCompare(a.heure)).map((j) => ({ ...this.decorate(j), trCls: (s.selId === j.id ? 'sel ' : '') + (s.newId === j.id ? 'new' : ''), open: () => this.openJob(j.id) }));
     const run = dayJobs.filter((j) => this.FLOW.indexOf(j.statut) >= 0 && j.statut !== 'ENVOYE').length;
     const sentJ = dayJobs.filter((j) => j.statut === 'ENVOYE' && j.perf != null);
     const err = dayJobs.filter((j) => j.statut === 'ERREUR').length;

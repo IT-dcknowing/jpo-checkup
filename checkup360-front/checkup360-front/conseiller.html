@@ -149,7 +149,7 @@
 
 <sc-if value="{{sel.isErr}}" hint-placeholder-val="{{false}}">
 <div style="padding: 16px; border-radius: 16px; background: #FEE2E2; border: 1px solid #F6C7C7; display: flex; flex-direction: column; gap: 10px">
-<p style="font-size: 14px"><b>Lecture impossible.</b> {{sel.errMsg}} Aucun rapport automatique ; e-mail d’excuse envoyé.</p>
+<p style="font-size: 14px"><b>Diagnostic interrompu.</b> {{sel.errMsg}} Aucun rapport automatique : rappeler le client.</p>
 <div style="display: flex; gap: 8px; flex-wrap: wrap"><button type="button" class="btn btn-p btn-sm {{retryCls}}" onClick="{{retry}}">Relancer le traitement</button><button type="button" class="btn btn-g btn-sm" onClick="{{callClient}}">Noter le rappel effectué</button></div>
 </div>
 </sc-if>

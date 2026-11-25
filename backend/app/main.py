@@ -23,7 +23,7 @@ from pydantic import ValidationError
 
 from . import ics
 from .config import Settings, get_settings
-from .db import TERMINAUX, Database
+from .db import TERMINAUX, Database, now_iso
 from .llm import LLMClient, OpenRouterClient
 from .pipeline import FRONT_ETAPE, TYPES_FICHIERS, Pipeline
 from .readers import ALLOWED_EXT
@@ -52,7 +52,7 @@ def purge(db: Database, sb: Supabase, s: Settings) -> dict:
         db.update_job(job["id"], erreur="traitement interrompu (délai de la fonction dépassé)",
                       erreur_publique="Votre diagnostic n'a pas pu être produit automatiquement. Un conseiller DC-KNOWING vous rappelle très vite.")
         db.log_event(job["id"], "ERREUR", job["progression"], {"etape": "ERREUR", "progression": job["progression"],
-                     "message": "Traitement interrompu · un conseiller vous rappelle", "niveau": "erreur"})
+                     "message": "Traitement interrompu · un conseiller vous rappelle", "niveau": "erreur", "t": now_iso()})
     return {"fichiers_bruts": len(docs), "rapports": n_rapports, "traitements_interrompus": len(bloques)}
 
 
@@ -402,7 +402,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
         if not job["resultat_ia"] and not db.job_documents(job_id):
             raise HTTPException(409, "Fichiers sources supprimés : le visiteur doit refaire un dépôt")
         db.update_job(job_id, erreur=None, erreur_publique=None, completed_at=None)
-        db.log_event(job_id, "EN_ATTENTE", 5, {"etape": "EN_ATTENTE", "progression": 5, "message": "Traitement relancé par un conseiller", "niveau": ""})
+        db.log_event(job_id, "EN_ATTENTE", 5, {"etape": "EN_ATTENTE", "progression": 5, "message": "Traitement relancé par un conseiller", "niveau": "", "t": now_iso()})
         db.audit(job_id, user, "relance", client_ip(request))
         if db.claim(job_id):
             pipeline.process(job_id)

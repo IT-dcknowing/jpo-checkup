@@ -312,6 +312,7 @@
       markInterview: function (id) { return req('POST', '/admin/diagnostics/' + encodeURIComponent(id) + '/entretien-realise', null, { admin: true }); },
       markCalled: function (id) { return req('POST', '/admin/diagnostics/' + encodeURIComponent(id) + '/rappel-effectue', null, { admin: true }); },
       pdf: function (id) { return req('GET', '/admin/diagnostics/' + encodeURIComponent(id) + '/pdf', null, { admin: true }); },
+      detail: function (id) { return req('GET', '/admin/diagnostics/' + encodeURIComponent(id), null, { admin: true }); },
       exportUrl: function (jour) { return cfg.apiBase + '/admin/diagnostics.csv?jour=' + encodeURIComponent(jour); },
       exportCsv: function (jour) { return downloadBlob('/admin/diagnostics.csv?jour=' + encodeURIComponent(jour), 'diagnostics_' + jour + '.csv', true); }
     }

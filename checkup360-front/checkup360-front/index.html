@@ -344,6 +344,7 @@
 </div>
 </sc-for>
 <sc-if value="{{err.files}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.files}}</span></sc-if>
+<p class="hint"><b>Documents attendus : la balance générale (idéal), le compte de résultat ou le bilan.</b> Les journaux (ventes, achats, paie) et les grands livres ne permettent pas de calculer le diagnostic.</p>
 <p class="hint">CSV ou XLSX exportés de votre logiciel : lecture la plus rapide. PDF natif ou numérisé accepté. 20 Mo maximum par fichier.</p>
 </div>
 </sc-if>
@@ -445,7 +446,7 @@
 
 <sc-if value="{{failed}}" hint-placeholder-val="{{false}}">
 <div class="up" style="padding: 18px; border-radius: 16px; background: #FEE2E2; border: 1px solid #F6C7C7; display: flex; flex-direction: column; gap: 12px">
-<p style="font-size: 14px"><b>Vos documents n’ont pas pu être lus de façon fiable</b> (confiance de lecture 0,24, seuil 0,30). Aucun rapport automatique n’est produit pour éviter des chiffres erronés. Un e-mail vous a été envoyé et un conseiller vous rappelle au <b class="m">{{telShown}}</b>.</p>
+<p style="font-size: 14px"><b>Aucun rapport automatique.</b> {{failMsg}} Un e-mail vous a été envoyé et un conseiller vous rappelle au <b class="m">{{telShown}}</b>.</p>
 <div style="display: flex; gap: 10px; flex-wrap: wrap">
 <button type="button" class="btn btn-p" onClick="{{retryFiles}}">Déposer d’autres fichiers</button>
 <button type="button" class="btn btn-g" onClick="{{callMe}}">Être rappelé maintenant</button>
