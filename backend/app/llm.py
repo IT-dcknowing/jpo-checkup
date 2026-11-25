@@ -53,6 +53,7 @@ class OpenRouterClient:
         self.http = http or httpx.Client(timeout=settings.llm_timeout)
         self.sleep = sleep
         self._no_optional: set[str] = set()  # modèles qui refusent response_format / reasoning
+        self._deadline: float | None = None  # fin de la part de temps du modèle en cours
 
     # ------------------------------------------------------------------ un appel HTTP
     def _payload(self, model: str, messages: list[dict]) -> dict:
@@ -71,7 +72,13 @@ class OpenRouterClient:
         tries = len(self.s.llm_backoff) + 1
         for i in range(tries):
             try:
-                r = self.http.post(self.s.openrouter_url, headers=headers, json=self._payload(model, messages))
+                timeout = self.s.llm_timeout
+                if self._deadline:
+                    reste = self._deadline - time.monotonic()
+                    if reste < 5:
+                        raise _Transient("part de temps du modèle épuisée")
+                    timeout = min(timeout, reste)
+                r = self.http.post(self.s.openrouter_url, headers=headers, json=self._payload(model, messages), timeout=timeout)
             except httpx.HTTPError as e:
                 err = f"réseau ({type(e).__name__})"
             else:
@@ -80,7 +87,8 @@ class OpenRouterClient:
                     text = self._content(r)
                     if text:
                         return text
-                    err = "réponse vide"
+                    # réponse vide (souvent : tout le quota consommé en raisonnement) : inutile d'insister sur ce modèle
+                    raise _Transient(f"réponse vide ({self._finish(r)})")
                 elif code in (401, 403):
                     raise LLMAuthError(f"clé OpenRouter refusée (HTTP {code})")
                 elif code in (400, 404, 422) and model not in self._no_optional:
@@ -100,6 +108,13 @@ class OpenRouterClient:
         raise _Transient("échec")
 
     @staticmethod
+    def _finish(r: httpx.Response) -> str:
+        try:
+            return str(r.json()["choices"][0].get("finish_reason") or "?")
+        except (ValueError, KeyError, IndexError, TypeError):
+            return "?"
+
+    @staticmethod
     def _content(r: httpx.Response) -> str:
         try:
             msg = r.json()["choices"][0]["message"]
@@ -117,9 +132,15 @@ class OpenRouterClient:
         errors: list[str] = []
         debut = time.monotonic()
         for model in self.s.llm_models:
-            if self.s.llm_budget and errors and time.monotonic() - debut > self.s.llm_budget:
-                errors.append("budget de temps de l'analyse dépassé")
-                break
+            if self.s.llm_budget:  # chaque modèle restant reçoit une part égale du budget restant
+                reste = self.s.llm_budget - (time.monotonic() - debut)
+                restants = len(self.s.llm_models) - self.s.llm_models.index(model)
+                if reste < 10:
+                    errors.append("budget de temps de l'analyse dépassé")
+                    break
+                self._deadline = time.monotonic() + reste / restants
+            else:
+                self._deadline = None
             messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
             for essai in range(2):  # essai initial + une relance avec le message d'erreur (spec §4.3)
                 try:
