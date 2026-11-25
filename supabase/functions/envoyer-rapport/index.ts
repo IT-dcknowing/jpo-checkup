@@ -59,6 +59,24 @@ ${p}${b}
 </div></body></html>`;
 }
 
+// Clé serveur au nouveau format (sb_secret_...) ou ancienne clé service_role : on vérifie auprès de Supabase
+// qu'elle ouvre la table audit_logs, réservée au rôle service_role (aucune policy pour les visiteurs).
+const clesServeur = new Set<string>();
+async function estCleServeur(jeton: string): Promise<boolean> {
+  if (clesServeur.has(jeton)) return true;
+  if (!jeton.startsWith("sb_secret_") && !jeton.startsWith("eyJ")) return false;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/audit_logs?select=id&limit=1`, {
+      headers: { apikey: jeton, Authorization: `Bearer ${jeton}` },
+    });
+    if (r.ok) {
+      clesServeur.add(jeton);
+      return true;
+    }
+  } catch (_) { /* clé refusée */ }
+  return false;
+}
+
 type PieceJointe = { filename: string; content: string; content_type?: string };
 
 async function envoyer(to: string, subject: string, html: string, text: string, attachments: PieceJointe[] = [], copie = false) {
@@ -89,7 +107,7 @@ Deno.serve(async (req) => {
   // ---------------------------------------------------------------- qui appelle ?
   const jeton = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!jeton) return json(401, { error: "Authentification requise" });
-  const serveur = egal(jeton, SERVICE_KEY);
+  const serveur = egal(jeton, SERVICE_KEY) || await estCleServeur(jeton);
   let user: { id: string; email?: string } | null = null;
   if (!serveur) {
     const { data, error } = await admin.auth.getUser(jeton);
