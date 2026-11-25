@@ -1,0 +1,16 @@
+RAPPORT DE DIAGNOSTIC JPO — DC-KNOWING — VERSION WORD (4 PAGES)
+
+Installer (une fois) :
+  cd word && npm install          (Node 20 ou plus)
+  LibreOffice + pdfinfo           (seulement pour le contrôle des 4 pages et le PDF)
+
+Produire un rapport :
+  python3 word/generer_rapport.py entree.json Diagnostic_JPO-2026-0042.docx --pdf
+  -> crée le .docx, le .md (texte modifiable) et le .pdf
+
+Corriger un rapport (conseiller ou IA) :
+  modifier Diagnostic_JPO-2026-0042.md   (syntaxe : word/GUIDE_MARKDOWN.txt)
+  node word/md_vers_word.js Diagnostic_JPO-2026-0042.md Diagnostic_JPO-2026-0042.docx
+
+Exemples : dossier exemples/ (cas type, entreprise saine, données manquantes).
+Spécification complète : SPEC_TECHNIQUE_DIAGNOSTIC_JPO_DC-KNOWING_v2.1.txt

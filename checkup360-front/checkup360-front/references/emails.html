@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-mails Check-up 360 — maquettes</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&amp;family=JetBrains+Mono:wght@400;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Sora:wght@700;800&amp;family=Poppins:ital,wght@0,500;0,700;0,800;0,900;1,400;1,500;1,700;1,800;1,900&amp;family=Mrs+Saint+Delafield&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.em,.em *{box-sizing:border-box}
+.em p{margin:0}
+.em h1,.em h2{margin:0;font-family:Sora,system-ui,sans-serif;letter-spacing:-.02em;line-height:1.15}
+.m{font-family:"JetBrains Mono",ui-monospace,monospace}
+.micro{font-size:11px;text-transform:uppercase;letter-spacing:.14em;font-weight:700}
+.script{font-family:Amsterdam,"Mrs Saint Delafield",cursive;font-weight:400;display:inline-block;-webkit-text-stroke:.7px currentColor;letter-spacing:0;line-height:1}.wm{font-family:Poppins,Sora,system-ui,sans-serif;font-weight:900;text-transform:uppercase;letter-spacing:-.02em;line-height:1;white-space:nowrap}.lockup{display:inline-flex;flex-direction:column;align-items:center;line-height:1;vertical-align:middle}
+.mail{background:#FFFFFF;border:1px solid #E0E0E0;border-radius:24px;box-shadow:0 12px 28px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column}
+.meta{padding:18px 24px;border-bottom:1px solid #E0E0E0;display:grid;grid-template-columns:70px 1fr;gap:4px 10px;font-size:13px}
+.meta span:nth-child(odd){color:#525252}
+.cta{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 22px;border-radius:14px;font-weight:700;font-size:14px;text-decoration:none}
+body{background:#FFFFFF}
+</style>
+</head>
+<body>
+<div class="em" style="width: 2100px; height: 900px; padding: 48px 56px; font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif; color: #000000; background-color: #FFFFFF; background-image: linear-gradient(to right, #F9F6E8 1px, transparent 1px), linear-gradient(to bottom, #F9F6E8 1px, transparent 1px); background-size: 24px 24px; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; justify-content: space-between; align-items: flex-end">
+<div><p class="micro">Section 12 de la spécification</p><h1 style="font-size: 32px; font-weight: 800; margin-top: 6px">E-mails envoyés au visiteur</h1></div>
+<p style="font-size: 13px; color: #525252; max-width: 46ch; text-align: right">Expéditeur vérifié (SPF, DKIM, DMARC) · copie interne au conseiller du jour · PDF joint ≤ 2 Mo visé</p>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 28px; flex: 1; min-height: 0">
+<article class="mail" aria-label="E-mail du code de connexion">
+<div style="padding: 10px 24px; background: #FEF9E7; color: #785C03; font-size: 12px; font-weight: 700">Connexion « Mes diagnostics » · code à usage unique</div>
+<div class="meta"><span>De</span><b>DC-KNOWING · Diagnostic JPO &lt;[adresse d’envoi vérifiée]&gt;</b><span>À</span><span style="color: #000000">direction@exemple.ci</span><span>Objet</span><b>Votre code d’accès : 482913</b></div>
+<div style="padding: 28px 28px 24px; display: flex; flex-direction: column; gap: 18px; flex: 1">
+<div style="display: flex; align-items: center; gap: 16px"><img src="../assets/img/logo-dc-knowing.png" alt="DC-KNOWING — The bespoke partner" style="height: 40px; width: auto; display: block"><span style="width: 1px; height: 40px; background: #E0E0E0"></span><span class="lockup"><span class="script" style="font-size: 28px; margin-bottom: -10px; position: relative; z-index: 1">Journées</span><span class="wm" style="font-size: 15px">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 92px; height: auto; display: block; margin-top: 2px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></span></div>
+<p style="font-size: 15px">Bonjour,</p>
+<p style="font-size: 15px; line-height: 1.55">Voici votre code pour accéder à « Mes diagnostics » et lancer votre Check-up 360 :</p>
+<div style="align-self: flex-start; padding: 16px 28px; border-radius: 16px; background: #FFD700; border: 1.5px solid #000000"><span class="m" style="font-size: 36px; font-weight: 700; letter-spacing: .3em">482913</span></div>
+<p style="font-size: 14px; color: #525252; line-height: 1.55">Copiez-le et collez-le sur la page ouverte. Il est valable 10 minutes et ne sert qu’une fois. Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p>
+<p style="margin-top: auto; font-size: 11px; color: #525252; border-top: 1px solid #E0E0E0; padding-top: 12px">DC-KNOWING ne vous demandera jamais ce code par téléphone.<br><b style="color: #000000">27 22 42 14 43 / 07 67 13 19 93</b> · <span style="color: #785C03; font-weight: 700">portaildck.dc-knowing.com</span> · infos@dc-knowing.com</p>
+</div>
+</article>
+
+<article class="mail" aria-label="E-mail de succès">
+<div style="padding: 10px 24px; background: #DCFCE7; color: #15803D; font-size: 12px; font-weight: 700">Cas nominal · rapport envoyé</div>
+<div class="meta"><span>De</span><b>DC-KNOWING · Diagnostic JPO &lt;[adresse d’envoi vérifiée]&gt;</b><span>À</span><span style="color: #000000">direction@exemple.ci</span><span>Cc</span><span style="color: #000000">Conseiller du jour</span><span>Objet</span><b>Votre diagnostic financier — Journées Portes Ouvertes DC-KNOWING</b></div>
+<div style="padding: 28px 28px 24px; display: flex; flex-direction: column; gap: 18px; flex: 1">
+<div style="display: flex; align-items: center; gap: 16px"><img src="../assets/img/logo-dc-knowing.png" alt="DC-KNOWING — The bespoke partner" style="height: 40px; width: auto; display: block"><span style="width: 1px; height: 40px; background: #E0E0E0"></span><span class="lockup"><span class="script" style="font-size: 28px; margin-bottom: -10px; position: relative; z-index: 1">Journées</span><span class="wm" style="font-size: 15px">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 92px; height: auto; display: block; margin-top: 2px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></span></div>
+<p style="font-size: 15px">Bonjour Aïcha Koné,</p>
+<div style="display: grid; gap: 8px; font-size: 15px; line-height: 1.55">
+<p>Votre diagnostic est prêt : <b>performance 50/100 (C)</b> et <b>conformité 75/100 (B)</b>.</p>
+<p>En bref : une activité en croissance, mais une trésorerie négative et une FNE non activée à traiter dans les 30 jours.</p>
+<p>Il est aussi rangé dans « Mes diagnostics », avec votre invitation et le programme. Votre conseiller vous attend pour un entretien individuel.</p>
+</div>
+<div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+<a class="cta" href="../rapport.html" style="background: #FFD700; color: #000000">Télécharger mon rapport</a>
+<span style="font-size: 12px; color: #525252">Lien sécurisé valable 7 jours</span>
+</div>
+<div style="display: flex; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid #E0E0E0; border-radius: 14px; background: #FAFAF7">
+<span class="m" style="width: 40px; height: 40px; border-radius: 10px; background: #000000; color: #FFD700; display: grid; place-items: center; font-size: 11px; font-weight: 700">PDF</span>
+<div><b style="font-size: 13px">Diagnostic_DC-KNOWING_JPO-1612-017.pdf</b><p class="m" style="font-size: 12px; color: #525252">3 pages · 1,4 Mo</p></div>
+</div>
+<p style="margin-top: auto; font-size: 11px; color: #525252; border-top: 1px solid #E0E0E0; padding-top: 12px">Ce diagnostic ne constitue ni un audit, ni une certification des comptes, ni un avis juridique. Vos fichiers bruts sont supprimés sous 24 h.<br><b style="color: #000000">27 22 42 14 43 / 07 67 13 19 93</b> · <span style="color: #785C03; font-weight: 700">portaildck.dc-knowing.com</span> · infos@dc-knowing.com · Cocody Riviera 2, Abidjan</p>
+</div>
+</article>
+
+<article class="mail" aria-label="E-mail d’erreur">
+<div style="padding: 10px 24px; background: #FEE2E2; color: #DC2626; font-size: 12px; font-weight: 700">Cas d’erreur · lecture impossible (confiance &lt; 0,30)</div>
+<div class="meta"><span>De</span><b>DC-KNOWING · Diagnostic JPO &lt;[adresse d’envoi vérifiée]&gt;</b><span>À</span><span style="color: #000000">contact@exemple.ci</span><span>Cc</span><span style="color: #000000">Conseiller du jour</span><span>Objet</span><b>Votre diagnostic — un conseiller vous rappelle</b></div>
+<div style="padding: 28px 28px 24px; display: flex; flex-direction: column; gap: 18px; flex: 1">
+<div style="display: flex; align-items: center; gap: 16px"><img src="../assets/img/logo-dc-knowing.png" alt="DC-KNOWING — The bespoke partner" style="height: 40px; width: auto; display: block"><span style="width: 1px; height: 40px; background: #E0E0E0"></span><span class="lockup"><span class="script" style="font-size: 28px; margin-bottom: -10px; position: relative; z-index: 1">Journées</span><span class="wm" style="font-size: 15px">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 92px; height: auto; display: block; margin-top: 2px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></span></div>
+<p style="font-size: 15px">Bonjour,</p>
+<div style="display: grid; gap: 8px; font-size: 15px; line-height: 1.55">
+<p>Nous vous prions de nous excuser : les documents déposés n’ont pas pu être lus de façon assez fiable pour produire un rapport automatique.</p>
+<p>Plutôt que de vous envoyer des chiffres incertains, un conseiller vous rappelle dans la journée pour reprendre votre diagnostic avec vous.</p>
+<p>Si vous êtes encore au salon, passez au stand Check-up 360 (siège DC-KNOWING, Cocody Riviera 2) avec une version numérique de votre balance générale.</p>
+</div>
+<div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+<a class="cta" href="../index.html" style="background: #000000; color: #FFFFFF">Déposer d’autres fichiers</a>
+<span style="font-size: 12px; color: #525252">Référence JPO-1612-003</span>
+</div>
+<div style="padding: 12px 14px; border: 1px solid #FFD700; border-radius: 14px; background: #FEF9E7; font-size: 13px"><b>Astuce :</b> les fichiers CSV ou XLSX exportés de votre logiciel comptable sont lus plus vite et plus sûrement qu’un PDF numérisé.</div>
+<p style="margin-top: auto; font-size: 11px; color: #525252; border-top: 1px solid #E0E0E0; padding-top: 12px">Vos fichiers bruts sont supprimés sous 24 h, conformément à la notice d’information.<br><b style="color: #000000">27 22 42 14 43 / 07 67 13 19 93</b> · <span style="color: #785C03; font-weight: 700">portaildck.dc-knowing.com</span> · infos@dc-knowing.com · Cocody Riviera 2, Abidjan</p>
+</div>
+</article>
+</div>
+</div>
+</body>
+</html>

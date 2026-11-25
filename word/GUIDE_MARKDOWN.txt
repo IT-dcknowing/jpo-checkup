@@ -1,0 +1,138 @@
+================================================================================
+ GUIDE DU MARKDOWN — Rapport de diagnostic JPO DC-KNOWING
+ Pour les conseillers et pour l'IA qui modifie le fichier rapport.md
+================================================================================
+
+ PRINCIPE
+   Le fichier .md contient TOUT le texte du rapport. La mise en page (couleurs,
+   polices, encadrés, graphiques, en-tête, pied de page) est figée dans
+   md_vers_word.js. On modifie le .md, puis on lance :
+
+       node md_vers_word.js rapport.md rapport.docx
+
+   Le résultat a toujours la même présentation. Le rapport doit rester sur
+   4 PAGES EXACTEMENT : si une modification ajoute du texte, en retirer ailleurs
+   sur la même page. Contrôle :
+       soffice --headless --convert-to pdf rapport.docx && pdfinfo rapport.pdf
+
+ RÈGLES POUR UNE IA QUI MODIFIE LE FICHIER
+   1. Ne jamais changer un nombre, ni en ajouter un.
+   2. Garder les 4 séparateurs de page, les blocs ``` et les encadrés > [!…].
+   3. Une ligne de tableau reste une ligne ; jamais de « | » dans un texte.
+   4. Phrases courtes, vouvoiement, aucun sigle comptable sans explication.
+   5. Répondre avec le fichier .md complet, rien d'autre.
+
+
+--------------------------------------------------------------------------------
+ 1. EN-TÊTE DU FICHIER (obligatoire, tout en haut)
+--------------------------------------------------------------------------------
+   ---
+   entreprise: Client_A — Commerce de gros     (pied de page)
+   periode: Exercice 2025 (du 01/01/2025 au 31/12/2025)
+   date: 16/12/2026
+   reference: JPO-2026-0042                    (pied de page)
+   ---
+
+
+--------------------------------------------------------------------------------
+ 2. STRUCTURE
+--------------------------------------------------------------------------------
+   ===PAGE===            saut de page (3 dans le fichier → 4 pages)
+   # Titre de page       un seul par page, souligné d'un trait or
+   ## Section           titre de section
+   ### Sous-section     titre or foncé
+   Paragraphe           texte libre ; **gras** autorisé
+   - point              liste à puces
+   1. point             liste numérotée
+   (ligne vide)         sépare les paragraphes
+
+
+--------------------------------------------------------------------------------
+ 3. TABLEAU
+--------------------------------------------------------------------------------
+   | Obligation | Votre situation | Ce qu'il faut faire |
+   |---|---|---|
+   | CMU | {orange} En retard | Payer l'arriéré, puis l'intégrer à la paie. |
+
+   La première ligne est l'en-tête (fond noir). Une cellule qui commence par
+   {vert} {orange} {rouge} ou {gris} devient une pastille de couleur.
+   Le tableau n'est jamais coupé entre deux pages.
+
+
+--------------------------------------------------------------------------------
+ 4. ENCADRÉS
+--------------------------------------------------------------------------------
+   > [!AVIS] Notre avis en une phrase
+   > Texte de l'encadré (plusieurs lignes « > » possibles).
+   > - une puce est possible
+
+   Types : AVIS (fond noir, titre or) · INFO (fond or pâle) ·
+           CONSEIL (or pâle, filet or) · ALERTE (rose, filet rouge) ·
+           OK (vert pâle, filet vert)
+
+
+--------------------------------------------------------------------------------
+ 5. BLOCS SPÉCIAUX
+--------------------------------------------------------------------------------
+ 5.1 Les deux notes (page 1)
+   ```scores
+   Santé financière | 50 | C | **Fragile.** Phrase d'explication.
+   Conformité | 75 | B | **Correcte.** Phrase d'explication.
+   ```
+   Colonnes : nom | note sur 100 | lettre A à D | phrase.
+
+ 5.2 Indicateur (page 2, un bloc par indicateur)
+   ```indicateur
+   statut: rouge                       vert | orange | rouge | gris
+   titre: Rentabilité                  petit titre en capitales
+   valeur: 1 FCFA gagné sur 100 FCFA vendus   la valeur, en mots si possible
+   mot: À corriger                     étiquette colorée (facultatif)
+   texte: Ce que cela veut dire, en deux phrases.
+   conseil: ce qu'il faut faire (commence par une minuscule).
+   ```
+
+ 5.3 Graphique « où va votre argent » (barre empilée)
+   ```graphique repartition
+   titre: Pour 100 FCFA vendus, où va votre argent ?
+   Achats de marchandises | 65.6 | #525252
+   Bénéfice | 1.2 | #FFD700
+   ```
+   Lignes : libellé | valeur (point décimal) | couleur. Le total fait 100.
+
+ 5.4 Graphique de comparaison (barres avec repère)
+   ```graphique comparaison
+   titre: Délais de paiement, en jours
+   unite: jours
+   Vos clients vous paient en | 77 | repère 60 j | orange
+   Vous payez vos fournisseurs en | 34 | repère 45 j | orange
+   ```
+   Lignes : libellé | valeur | repère (le nombre sert à placer le trait) |
+   couleur (vert | orange | rouge).
+
+ 5.5 Action du plan (page 4, 4 blocs maximum)
+   ```action
+   priorite: 1                 1 = URGENT (rouge), 2 = IMPORTANT (noir),
+                               3 = UTILE (jaune)
+   titre: Faire payer vos clients plus vite
+   pourquoi: c'est la cause principale de votre découvert.
+   comment: relance dès le lendemain de l'échéance et acompte à la commande.
+   gain: environ 7 millions FCFA de trésorerie        (facultatif)
+   delai: 3 à 6 mois
+   outil: Flow Sell
+   ```
+
+ 5.6 Mention en petits caractères
+   <!-- mention -->
+   Texte de la mention sur une ou plusieurs lignes, sans ligne vide.
+
+
+--------------------------------------------------------------------------------
+ 6. SI LE RAPPORT DÉBORDE SUR UNE 5e PAGE
+--------------------------------------------------------------------------------
+   Repérer la page trop longue, puis dans l'ordre :
+     1. raccourcir les phrases de cette page ;
+     2. retirer le paragraphe « En clair » (page 2) ou « Comment lire ce
+        rapport » (page 1) ;
+     3. retirer une ligne d'un tableau ou un « conseil » d'indicateur.
+   Ne pas réduire la taille du texte ni les marges.
+================================================================================

@@ -1,0 +1,44 @@
+"""Invitation agenda (.ics). Abidjan est en UTC+0 sans changement d'heure : les heures sont écrites en UTC (suffixe Z)."""
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+
+
+def _esc(text: str) -> str:
+    return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r", "").replace("\n", "\\n")
+
+
+def _fold(line: str) -> str:
+    """Lignes de 75 octets au plus (RFC 5545), coupées sur des caractères entiers."""
+    out, cur = [], ""
+    for ch in line:
+        if len((cur + ch).encode()) > (75 if not out else 74):
+            out.append(cur)
+            cur = ch
+        else:
+            cur += ch
+    out.append(cur)
+    return "\r\n ".join(out)
+
+
+def _utc(jour: str, hhmm: str) -> str:
+    h, m = hhmm.split(":")
+    return datetime.fromisoformat(jour).replace(hour=int(h), minute=int(m), tzinfo=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def build_ics(uid_base: str, jour: str, debut: str, fin: str, lieu: str, entretien: str | None = None, minutes: int = 30) -> bytes:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    events = [(f"{uid_base}-jpo", "Journées Portes Ouvertes DC-KNOWING", _utc(jour, debut), _utc(jour, fin),
+               "Journées Portes Ouvertes DC-KNOWING : Check-up 360, entretiens individuels et présentation de La Suite Flow."
+               + (f" Votre entretien individuel est à {entretien}." if entretien else ""))]
+    if entretien:
+        h, m = map(int, entretien.split(":"))
+        end = (datetime(2000, 1, 1, h, m) + timedelta(minutes=minutes)).strftime("%H:%M")
+        events.append((f"{uid_base}-entretien", "Entretien individuel Check-up 360 (DC-KNOWING)", _utc(jour, entretien), _utc(jour, end),
+                       "Un expert DC-KNOWING chiffre votre plan d'action avec vous."))
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//DC-KNOWING//JPO 2026//FR", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"]
+    for uid, titre, start, end, desc in events:
+        lines += ["BEGIN:VEVENT", f"UID:{uid}@dc-knowing.com", f"DTSTAMP:{stamp}", f"DTSTART:{start}", f"DTEND:{end}",
+                  f"SUMMARY:{_esc(titre)}", f"LOCATION:{_esc(lieu)}", f"DESCRIPTION:{_esc(desc)}", "END:VEVENT"]
+    lines.append("END:VCALENDAR")
+    return ("\r\n".join(_fold(l) for l in lines) + "\r\n").encode("utf-8")

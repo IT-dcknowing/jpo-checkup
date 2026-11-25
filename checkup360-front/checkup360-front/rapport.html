@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rapport Check-up 360 — modèle 3 pages A4</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Sora:wght@600;700;800&amp;family=Poppins:ital,wght@0,500;0,700;0,800;0,900;1,400;1,500;1,700;1,800;1,900&amp;family=Mrs+Saint+Delafield&amp;display=swap" rel="stylesheet">
+<style>
+@property --p{syntax:'<number>';inherits:false;initial-value:0}
+body{margin:0}
+.rp,.rp *{box-sizing:border-box}
+.rp h1,.rp h2,.rp h3{font-family:Sora,system-ui,sans-serif;letter-spacing:-.02em;line-height:1.15;margin:0;font-weight:800}
+.rp p{margin:0}
+.pg{width:794px;min-height:1123px;padding:34px 40px 30px;background-color:#FFFFFF;background-image:linear-gradient(to right,#F9F6E8 1px,transparent 1px),linear-gradient(to bottom,#F9F6E8 1px,transparent 1px);background-size:24px 24px;background-position:-1px -1px;box-shadow:0 12px 28px rgba(0,0,0,.12);display:flex;flex-direction:column;gap:16px;font-size:12px;line-height:1.5;animation:up .6s both}
+.d{font-family:Sora,system-ui,sans-serif}
+.m{font-family:"JetBrains Mono",ui-monospace,monospace}
+.script{font-family:Amsterdam,"Mrs Saint Delafield",cursive;font-weight:400;display:inline-block;-webkit-text-stroke:.7px currentColor;letter-spacing:0;line-height:1}.wm{font-family:Poppins,Sora,system-ui,sans-serif;font-weight:900;text-transform:uppercase;letter-spacing:-.02em;line-height:1;white-space:nowrap}.lockup{display:inline-flex;flex-direction:column;align-items:center;line-height:1;vertical-align:middle}
+.micro{font-size:9.5px;text-transform:uppercase;letter-spacing:.14em;font-weight:700}
+.muted{color:#525252}
+.box{background:#FFFFFF;border:1px solid #E0E0E0;border-radius:14px;padding:12px 14px}
+.sec{font-size:15px;display:flex;align-items:center;gap:8px}
+.sec::before{content:"";width:10px;height:10px;background:#FFD700;border:1.5px solid #000000;border-radius:3px;flex:none}
+.feu{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.fv{background:#15803D}.fo{background:#D97706}.fr{background:#DC2626}
+.ring{--c:#000000;--tr:#EDEDED;width:var(--sz,96px);height:var(--sz,96px);border-radius:50%;background:conic-gradient(var(--c) calc(var(--p)*1%),var(--tr) 0);display:grid;place-items:center;position:relative;flex:none;animation:ringfill 1.4s cubic-bezier(.2,.8,.2,1) both}
+.ring::before{content:"";position:absolute;inset:13%;background:#FFFFFF;border-radius:50%}
+.ring b{position:relative;font:700 calc(var(--sz,96px)*.3)/1 "JetBrains Mono",monospace}
+.ring.gold{--c:#FFD700;--tr:#FEF9E7}
+.bdg{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:10.5px;font-weight:700;white-space:nowrap}
+.b-ok{background:#DCFCE7;color:#15803D}.b-warn{background:#FEF3C7;color:#92400E}.b-bad{background:#FEE2E2;color:#DC2626}.b-dark{background:#000000;color:#FFFFFF}.b-acc{background:#FFD700;color:#000000}.b-g{background:#EDEDED;color:#000000}
+.pill{display:inline-flex;padding:1px 8px;border-radius:8px;font:700 10px Sora,sans-serif;border:1px solid transparent;white-space:nowrap}
+.p-sell{background:#000000;color:#FFFFFF}.p-rh{background:#FFD700;color:#000000;border-color:#000000}.p-compta{background:#FFFFFF;color:#000000;border-color:#000000}
+table.tb{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;border:1px solid #E0E0E0;border-radius:12px;overflow:hidden;background:#FFFFFF}
+.tb th{background:#000000;color:#FFFFFF;text-align:left;padding:7px 10px;font:700 10.5px Sora,sans-serif}
+.tb td{padding:6px 10px;border-top:1px solid #E0E0E0;vertical-align:top}
+.wf{position:relative;height:14px;background:#FAFAF7;border-radius:3px}
+.wf i{position:absolute;top:0;bottom:0;border-radius:3px;min-width:3px;animation:grow .9s cubic-bezier(.2,.8,.2,1) both;transform-origin:left}
+.sb{height:10px;background:#EDEDED;border-radius:999px;overflow:hidden}
+.sb i{display:block;height:100%;border-radius:999px;animation:grow 1s cubic-bezier(.2,.8,.2,1) both;transform-origin:left}
+.foot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid #E0E0E0;font-size:9.5px;color:#525252}
+@keyframes ringfill{from{--p:0}}
+@keyframes up{from{opacity:0;transform:translateY(16px)}}
+@keyframes grow{from{transform:scaleX(0)}}
+@media (prefers-reduced-motion:reduce){.rp *{animation:none !important}}
+@page{size:A4;margin:0}
+@media print{body{background:#FFFFFF}.rp{width:auto !important;min-height:0 !important;padding:0 !important;gap:0 !important;background:none !important}.pg{box-shadow:none;break-after:page;animation:none}.pg:last-child{break-after:auto}}
+</style>
+</head>
+<body>
+<div class="rp" style="width: 874px; min-height: 3640px; padding: 40px; background: #EDEDED; display: flex; flex-direction: column; gap: 40px; align-items: center; font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif; color: #000000">
+
+<!-- ===================== PAGE 1 — SYNTHÈSE ===================== -->
+<section class="pg" aria-label="Page 1 — Synthèse">
+<header style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-bottom: 12px; border-bottom: 2px solid #000000">
+<div style="display: flex; align-items: center; gap: 12px"><img src="assets/img/logo-dc-knowing.png" alt="DC-KNOWING — The bespoke partner" style="height: 34px; width: auto; display: block"><span aria-hidden="true" style="width: 1px; height: 40px; background: #E0E0E0"></span><span class="lockup"><span class="script" style="font-size: 28px; margin-bottom: -10px; position: relative; z-index: 1">Journées</span><span class="wm" style="font-size: 15px">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 92px; height: auto; display: block; margin-top: 2px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></span></div>
+<div style="text-align: right"><p class="d" style="font-weight: 800; font-size: 15px">Diagnostic financier &amp; conformité</p><p class="muted" style="font-size: 11px">Journées Portes Ouvertes · 16–18 déc. 2026</p></div>
+</header>
+
+<div style="display: grid; grid-template-columns: 1.6fr 0.7fr 1.3fr 0.9fr 1fr; gap: 0; border: 1px solid #E0E0E0; border-radius: 12px; background: #FFFFFF; overflow: hidden">
+<div style="padding: 8px 12px; border-right: 1px solid #E0E0E0"><p class="micro muted">Entreprise</p><p style="font-weight: 700; font-size: 13px">Entreprise Exemple SARL</p></div>
+<div style="padding: 8px 12px; border-right: 1px solid #E0E0E0"><p class="micro muted">Effectif</p><p class="m" style="font-weight: 700">24</p></div>
+<div style="padding: 8px 12px; border-right: 1px solid #E0E0E0"><p class="micro muted">Période</p><p class="m" style="font-weight: 700">01/01 – 31/12/2025</p></div>
+<div style="padding: 8px 12px; border-right: 1px solid #E0E0E0"><p class="micro muted">Date</p><p class="m" style="font-weight: 700">16/12/2026</p></div>
+<div style="padding: 8px 12px"><p class="micro muted">Référence</p><p class="m" style="font-weight: 700">JPO-1612-017</p></div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 12px">
+<div class="box" style="display: flex; gap: 14px; align-items: center"><div class="ring gold" style="--sz: 92px; --p: 50" role="img" aria-label="Performance 50 sur 100"><b>50</b></div><div><p class="micro muted">Performance</p><p class="d" style="font-weight: 800; font-size: 22px; line-height: 1.1">Grade C</p><span class="bdg b-warn" style="margin-top: 6px">Performance fragile</span></div></div>
+<div class="box" style="display: flex; gap: 14px; align-items: center"><div class="ring" style="--sz: 92px; --p: 75" role="img" aria-label="Conformité 75 sur 100"><b>75</b></div><div><p class="micro muted">Conformité</p><p class="d" style="font-weight: 800; font-size: 22px; line-height: 1.1">Grade B</p><span class="bdg b-bad" style="margin-top: 6px">1 alerte critique</span></div></div>
+<div style="background: #000000; color: #FFFFFF; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; justify-content: center"><p class="micro" style="color: #FFD700">Verdict</p><p style="font-size: 12.5px; font-weight: 600; line-height: 1.45">Une activité en croissance, mais une trésorerie négative et une FNE non activée à traiter dans les 30 jours.</p></div>
+</div>
+
+<p style="display: flex; gap: 18px; flex-wrap: wrap; font-size: 11px"><span><b>Données exploitées :</b> <span class="m">95 %</span></span><span><b>Fiabilité de lecture :</b> bonne (<span class="m">0,91</span>)</span><span class="muted">Feux : <span class="feu fv"></span> vert · <span class="feu fo"></span> orange · <span class="feu fr"></span> rouge</span></p>
+
+<div>
+<h2 class="sec">Vos 8 indicateurs clés</h2>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px">
+<div class="box" style="padding: 10px 12px"><p class="micro muted">Chiffre d’affaires HT</p><p class="m" style="font-size: 19px; font-weight: 700; line-height: 1.3">420,0 M</p><p style="display: flex; align-items: center; gap: 6px; font-size: 10.5px"><span class="feu fv"></span>+5,0 % vs N-1</p></div>
+<div class="box" style="padding: 10px 12px"><p class="micro muted">Marge brute</p><p class="m" style="font-size: 19px; font-weight: 700; line-height: 1.3">32 %</p><p style="display: flex; align-items: center; gap: 6px; font-size: 10.5px"><span class="feu fo"></span>134,4 M · repère ≥ 40 %</p></div>
+<div class="box" style="padding: 10px 12px"><p class="micro muted">EBE / CA</p><p class="m" style="font-size: 19px; font-weight: 700; line-height: 1.3">4,0 %</p><p style="display: flex; align-items: center; gap: 6px; font-size: 10.5px"><span class="feu fr"></span>16,8 M · repère ≥ 10 %</p></div>
+<div class="box" style="padding: 10px 12px"><p class="micro muted">Résultat net / CA</p><p class="m" style="font-size: 19px; font-weight: 700; line-height: 1.3">1,3 %</p><p style="display: flex; align-items: center; gap: 6px; font-size: 10.5px"><span class="feu fo"></span>5,4 M · repère ≥ 5 %</p></div>
+<div class="box" style="padding: 10px 12px"><p class="micro muted">Trésorerie nette</p><p class="m" style="font-size: 19px; font-weight: 700; line-height: 1.3">−12,5 M</p><p style="display: flex; align-items: center; gap: 6px; font-size: 10.5px"><span class="feu fr"></span>repère &gt; 0</p></div>
+<div class="box" style="padding: 10px 12px"><p class="micro muted">Délai clients</p><p class="m" style="font-size: 19px; font-weight: 700; line-height: 1.3">78 j</p><p style="display: flex; align-items: center; gap: 6px; font-size: 10.5px"><span class="feu fo"></span>repère ≤ 60 j</p></div>
+<div class="box" style="padding: 10px 12px"><p class="micro muted">Délai fournisseurs</p><p class="m" style="font-size: 19px; font-weight: 700; line-height: 1.3">34 j</p><p style="display: flex; align-items: center; gap: 6px; font-size: 10.5px"><span class="feu fo"></span>repère ≥ 45 j</p></div>
+<div class="box" style="padding: 10px 12px"><p class="micro muted">Endettement</p><p class="m" style="font-size: 19px; font-weight: 700; line-height: 1.3">45 %</p><p style="display: flex; align-items: center; gap: 6px; font-size: 10.5px"><span class="feu fv"></span>des capitaux propres · ≤ 50 %</p></div>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+<div class="box" style="background: #F4FBF6; border-color: #BBE5C8"><h3 style="font-size: 13px; display: flex; align-items: center; gap: 6px"><span class="feu fv"></span>Ce qui va bien</h3><ul style="margin: 8px 0 0; padding-left: 16px; display: grid; gap: 3px"><li>Chiffre d’affaires en hausse de 5,0 %</li><li>Déclarations DGI et cotisations CNPS à jour</li><li>Régime fiscal cohérent avec le chiffre d’affaires</li><li>Endettement maîtrisé : 45 % des capitaux propres</li><li>Masse salariale contenue : 22 % du CA</li></ul></div>
+<div class="box" style="background: #FEF6F6; border-color: #F6C7C7"><h3 style="font-size: 13px; display: flex; align-items: center; gap: 6px"><span class="feu fr"></span>Ce qui doit être traité</h3><ul style="margin: 8px 0 0; padding-left: 16px; display: grid; gap: 3px"><li>FNE non activée : mise en conformité obligatoire</li><li>Trésorerie nette négative de 12,5 M</li><li>Clients payés en 78 jours (repère 60)</li><li>EBE à 4,0 % du chiffre d’affaires</li><li>CMU déclarée en retard</li></ul></div>
+</div>
+
+<div class="box">
+<h2 class="sec">Pour 100 FCFA vendus, où va votre argent ?</h2>
+<div style="display: flex; height: 26px; border-radius: 8px; overflow: hidden; border: 1.5px solid #000000; margin-top: 12px">
+<span class="m" style="width: 68%; background: #000000; color: #FFFFFF; display: grid; place-items: center; font-size: 11px; font-weight: 700">68</span>
+<span class="m" style="width: 22%; background: #FFD700; display: grid; place-items: center; font-size: 11px; font-weight: 700">22</span>
+<span class="m" style="width: 6%; background: #525252; color: #FFFFFF; display: grid; place-items: center; font-size: 10px; font-weight: 700">6</span>
+<span style="width: 2%; background: #A3A3A3"></span>
+<span style="width: 0.7%; background: #785C03"></span>
+<span style="width: 1.3%; background: #15803D"></span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 10.5px">
+<span style="display: inline-flex; align-items: center; gap: 6px"><i style="width: 10px; height: 10px; background: #000000; border-radius: 2px"></i>Achats 68</span>
+<span style="display: inline-flex; align-items: center; gap: 6px"><i style="width: 10px; height: 10px; background: #FFD700; border: 1px solid #000000; border-radius: 2px"></i>Personnel 22</span>
+<span style="display: inline-flex; align-items: center; gap: 6px"><i style="width: 10px; height: 10px; background: #525252; border-radius: 2px"></i>Autres charges 6</span>
+<span style="display: inline-flex; align-items: center; gap: 6px"><i style="width: 10px; height: 10px; background: #A3A3A3; border-radius: 2px"></i>Amortissements et frais financiers 2</span>
+<span style="display: inline-flex; align-items: center; gap: 6px"><i style="width: 10px; height: 10px; background: #785C03; border-radius: 2px"></i>Impôt 0,7</span>
+<span style="display: inline-flex; align-items: center; gap: 6px"><i style="width: 10px; height: 10px; background: #15803D; border-radius: 2px"></i><b>Résultat net 1,3</b></span>
+</div>
+</div>
+
+<footer class="foot"><span>Diagnostic_DC-KNOWING_JPO-1612-017.pdf · Exemple — jeu de référence</span><span class="m">1 / 3</span></footer>
+</section>
+
+<!-- ===================== PAGE 2 — SANTÉ FINANCIÈRE ===================== -->
+<section class="pg" aria-label="Page 2 — Santé financière">
+<header style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-bottom: 10px; border-bottom: 2px solid #000000">
+<h1 style="font-size: 22px">Santé financière</h1>
+<p class="muted" style="font-size: 11px">Entreprise Exemple SARL · exercice 2025 · montants en M FCFA</p>
+</header>
+
+<div style="display: grid; grid-template-columns: 1.35fr 1fr; gap: 12px">
+<div class="box">
+<h2 class="sec">Du chiffre d’affaires au résultat net</h2>
+<div style="display: grid; grid-template-columns: 118px 1fr 50px; gap: 6px 8px; align-items: center; margin-top: 10px; font-size: 10.5px">
+<span style="font-weight: 700">Chiffre d’affaires</span><div class="wf"><i style="left: 0%; width: 100%; background: #000000"></i></div><span class="m" style="text-align: right; font-weight: 700">420,0</span>
+<span>Achats (601 + 602)</span><div class="wf"><i style="left: 32%; width: 68%; background: #FFD700; border: 1px solid #000000; animation-delay: .1s"></i></div><span class="m" style="text-align: right">−285,6</span>
+<span>Personnel</span><div class="wf"><i style="left: 10%; width: 22%; background: #FFD700; border: 1px solid #000000; animation-delay: .2s"></i></div><span class="m" style="text-align: right">−92,4</span>
+<span>Autres charges</span><div class="wf"><i style="left: 4%; width: 6%; background: #FFD700; border: 1px solid #000000; animation-delay: .3s"></i></div><span class="m" style="text-align: right">−25,2</span>
+<span style="font-weight: 700">EBE</span><div class="wf"><i style="left: 0%; width: 4%; background: #000000; animation-delay: .4s"></i></div><span class="m" style="text-align: right; font-weight: 700">16,8</span>
+<span>Dotations</span><div class="wf"><i style="left: 2.6%; width: 1.4%; background: #FFD700; border: 1px solid #000000; animation-delay: .5s"></i></div><span class="m" style="text-align: right">−6,0</span>
+<span>Résultat financier</span><div class="wf"><i style="left: 2%; width: 0.6%; background: #FFD700; border: 1px solid #000000; animation-delay: .6s"></i></div><span class="m" style="text-align: right">−2,4</span>
+<span>Impôt (IMF)</span><div class="wf"><i style="left: 1.3%; width: 0.7%; background: #FFD700; border: 1px solid #000000; animation-delay: .7s"></i></div><span class="m" style="text-align: right">−3,0</span>
+<span style="font-weight: 700">Résultat net</span><div class="wf"><i style="left: 0%; width: 1.3%; background: #15803D; animation-delay: .8s"></i></div><span class="m" style="text-align: right; font-weight: 700">5,4</span>
+</div>
+</div>
+<div class="box">
+<h2 class="sec">Score par domaine</h2>
+<div style="display: grid; gap: 9px; margin-top: 12px; font-size: 10.5px">
+<div><div style="display: flex; justify-content: space-between"><span>CA et croissance</span><b class="m">14/20</b></div><div class="sb"><i style="width: 70%; background: #000000"></i></div></div>
+<div><div style="display: flex; justify-content: space-between"><span>Marge brute et EBE</span><b class="m">9/20</b></div><div class="sb"><i style="width: 45%; background: #000000"></i></div></div>
+<div><div style="display: flex; justify-content: space-between"><span>Résultat net</span><b class="m">3/15</b></div><div class="sb"><i style="width: 20%; background: #DC2626"></i></div></div>
+<div><div style="display: flex; justify-content: space-between"><span>Trésorerie et délais</span><b class="m">6/20</b></div><div class="sb"><i style="width: 30%; background: #DC2626"></i></div></div>
+<div><div style="display: flex; justify-content: space-between"><span>Masse salariale</span><b class="m">7/10</b></div><div class="sb"><i style="width: 70%; background: #000000"></i></div></div>
+<div><div style="display: flex; justify-content: space-between"><span>Endettement</span><b class="m">11/15</b></div><div class="sb"><i style="width: 73%; background: #000000"></i></div></div>
+<p class="d" style="text-align: right; font-weight: 800; font-size: 13px; margin-top: 2px">Total 50/100 · grade C</p>
+</div>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+<div class="box">
+<h2 class="sec">Délais de paiement et BFR</h2>
+<div style="display: grid; gap: 14px; margin-top: 12px; font-size: 10.5px">
+<div><div style="display: flex; justify-content: space-between"><span>Délai clients</span><b class="m">78 j</b></div>
+<div style="position: relative; height: 12px; background: #EDEDED; border-radius: 999px; margin-top: 4px"><i style="position: absolute; left: 0; top: 0; bottom: 0; width: 65%; background: #D97706; border-radius: 999px"></i><i style="position: absolute; left: 50%; top: -4px; bottom: -4px; width: 2px; background: #000000"></i></div>
+<p class="muted" style="font-size: 9.5px; margin-top: 3px">Repère : 60 j (trait noir) · échelle 0–120 j</p></div>
+<div><div style="display: flex; justify-content: space-between"><span>Délai fournisseurs</span><b class="m">34 j</b></div>
+<div style="position: relative; height: 12px; background: #EDEDED; border-radius: 999px; margin-top: 4px"><i style="position: absolute; left: 0; top: 0; bottom: 0; width: 28.3%; background: #D97706; border-radius: 999px"></i><i style="position: absolute; left: 37.5%; top: -4px; bottom: -4px; width: 2px; background: #000000"></i></div>
+<p class="muted" style="font-size: 9.5px; margin-top: 3px">Repère : 45 j minimum</p></div>
+<div style="display: flex; gap: 10px; align-items: center; padding: 8px 10px; background: #FEF9E7; border: 1px solid #FFD700; border-radius: 10px"><span class="m" style="font-size: 17px; font-weight: 700">106 j</span><span>de chiffre d’affaires immobilisés dans le BFR (122,5 M : créances + stocks − fournisseurs)</span></div>
+</div>
+</div>
+<div class="box">
+<h2 class="sec">Structure du bilan</h2>
+<div style="display: grid; gap: 10px; margin-top: 12px; font-size: 10px">
+<div><p style="font-weight: 700; margin-bottom: 4px">Actif · 273,5 M</p>
+<div style="display: flex; height: 18px; border-radius: 6px; overflow: hidden; border: 1px solid #000000"><span style="width: 35.8%; background: #000000"></span><span style="width: 17.6%; background: #525252"></span><span style="width: 38.7%; background: #FFD700"></span><span style="width: 4.5%; background: #FEF9E7"></span><span style="width: 3.4%; background: #15803D"></span></div>
+<p class="muted" style="margin-top: 4px; line-height: 1.45">Immobilisations 98,0 · Stocks 48,0 · Créances clients 105,9 · Autres créances 12,4 · Trésorerie 9,2</p></div>
+<div><p style="font-weight: 700; margin-bottom: 4px">Passif · 273,5 M</p>
+<div style="display: flex; height: 18px; border-radius: 6px; overflow: hidden; border: 1px solid #000000"><span style="width: 43.9%; background: #000000"></span><span style="width: 19.7%; background: #525252"></span><span style="width: 11.5%; background: #FFD700"></span><span style="width: 6.8%; background: #F2C200"></span><span style="width: 10.1%; background: #FEF9E7"></span><span style="width: 8%; background: #DC2626"></span></div>
+<p class="muted" style="margin-top: 4px; line-height: 1.45">Capitaux propres 120,0 · Dettes financières 54,0 · Fournisseurs 31,4 · Dettes fiscales et sociales 18,7 · Autres dettes 27,7 · Trésorerie passif 21,7</p></div>
+</div>
+</div>
+</div>
+
+<div>
+<h2 class="sec">Vos ratios et leurs repères</h2>
+<table class="tb" style="margin-top: 8px">
+<thead><tr><th scope="col">Ratio</th><th scope="col">Votre valeur</th><th scope="col">Repère</th><th scope="col">Lecture</th></tr></thead>
+<tbody>
+<tr><td>Marge brute / CA</td><td class="m" style="font-weight: 700">32 %</td><td class="m">≥ 40 %</td><td><span class="feu fo"></span> À améliorer</td></tr>
+<tr><td>EBE / CA</td><td class="m" style="font-weight: 700">4,0 %</td><td class="m">≥ 10 %</td><td><span class="feu fr"></span> Insuffisant</td></tr>
+<tr><td>Résultat net / CA</td><td class="m" style="font-weight: 700">1,3 %</td><td class="m">≥ 5 %</td><td><span class="feu fo"></span> Faible mais positif</td></tr>
+<tr><td>Masse salariale / CA</td><td class="m" style="font-weight: 700">22 %</td><td class="m">≤ 20 % idéal · ≤ 35 %</td><td><span class="feu fo"></span> Acceptable</td></tr>
+<tr><td>Délai clients</td><td class="m" style="font-weight: 700">78 j</td><td class="m">≤ 60 j</td><td><span class="feu fo"></span> Trop long</td></tr>
+<tr><td>Délai fournisseurs</td><td class="m" style="font-weight: 700">34 j</td><td class="m">≥ 45 j</td><td><span class="feu fo"></span> Trop court</td></tr>
+<tr><td>Endettement / capitaux propres</td><td class="m" style="font-weight: 700">45 %</td><td class="m">≤ 50 %</td><td><span class="feu fv"></span> Maîtrisé</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="box" style="background: #FEF9E7; border-color: #FFD700">
+<h2 class="sec">Notre lecture de votre situation</h2>
+<div style="display: grid; gap: 8px; margin-top: 8px; font-size: 11.5px; line-height: 1.55">
+<p><b>Activité et rentabilité.</b> Votre chiffre d’affaires atteint 420 M FCFA, en hausse de 5,0 % sur un an. La marge brute s’établit à 32 %, sous le repère de 40 %. L’EBE, c’est-à-dire ce que l’activité dégage avant amortissements, frais financiers et impôt, représente 4,0 % du chiffre d’affaires : l’essentiel de la marge est absorbé par les achats et la masse salariale (22 %). Le résultat net reste positif, à 1,3 %.</p>
+<p><b>Trésorerie et délais.</b> La trésorerie nette est négative de 12,5 M FCFA : l’entreprise fonctionne sur découvert. Vos clients vous règlent en 78 jours en moyenne, au-delà du repère de 60 jours, alors que vous payez vos fournisseurs en 34 jours. Ce décalage immobilise 106 jours de chiffre d’affaires. Ramener le délai clients à 60 jours libérerait environ 24,4 M FCFA de trésorerie.</p>
+<p><b>Obligations fiscales et sociales.</b> Vos déclarations DGI et vos cotisations CNPS sont à jour, et votre régime fiscal, le réel simplifié, est cohérent avec votre chiffre d’affaires. Deux points demandent une action rapide : la facture normalisée électronique n’est pas encore activée, ce qui constitue l’alerte principale, et la CMU est déclarée en retard. Votre score de conformité est de 75/100.</p>
+</div>
+</div>
+
+<footer class="foot"><span>Méthode : extraction par IA, calculs déterministes, SYSCOHADA révisé · TVA 18 %</span><span class="m">2 / 3</span></footer>
+</section>
+
+<!-- ===================== PAGE 3 — CONFORMITÉ & PLAN ===================== -->
+<section class="pg" aria-label="Page 3 — Conformité et plan d’action">
+<header style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-bottom: 10px; border-bottom: 2px solid #000000">
+<h1 style="font-size: 22px">Conformité &amp; plan d’action</h1>
+<p class="muted" style="font-size: 11px">Score de conformité <b class="m" style="color: #000000">75/100</b> · grade B</p>
+</header>
+
+<table class="tb">
+<thead><tr><th scope="col">Obligation</th><th scope="col">Statut</th><th scope="col">Commentaire</th><th scope="col" style="text-align: right">Points</th></tr></thead>
+<tbody>
+<tr><td style="font-weight: 700">Déclarations DGI</td><td><span class="bdg b-ok">À jour</span></td><td>Déclarations déposées dans les délais</td><td class="m" style="text-align: right; font-weight: 700">25/25</td></tr>
+<tr><td style="font-weight: 700">FNE</td><td><span class="bdg b-bad">Non activée</span></td><td>Facturation électronique obligatoire : alerte critique</td><td class="m" style="text-align: right; font-weight: 700">3/25</td></tr>
+<tr><td style="font-weight: 700">Régime fiscal</td><td><span class="bdg b-ok">Réel simplifié</span></td><td>Cohérent avec un CA HT de 420 M (tranche 200–500 M)</td><td class="m" style="text-align: right; font-weight: 700">25/25</td></tr>
+<tr><td style="font-weight: 700">Social</td><td><span class="bdg b-warn">CMU en retard</span></td><td>CNPS, ITS et DISA à jour ; CMU à régulariser</td><td class="m" style="text-align: right; font-weight: 700">22/25</td></tr>
+</tbody>
+</table>
+
+<div>
+<h2 class="sec">Plan d’action priorisé</h2>
+<table class="tb" style="margin-top: 8px">
+<thead><tr><th scope="col">Prio.</th><th scope="col">Action</th><th scope="col">Gain</th><th scope="col">Délai</th><th scope="col">Outil concerné</th></tr></thead>
+<tbody>
+<tr><td><span class="bdg b-bad">P1</span></td><td><b>Activer la facture normalisée électronique (FNE)</b><br><span class="muted">Paramétrer la facturation et émettre les premières FNE</span></td><td>Mise en conformité obligatoire</td><td>Sous 30 jours</td><td><span class="pill p-sell">Flow Sell</span> <span class="pill p-compta">Flow Compta</span></td></tr>
+<tr><td><span class="bdg b-dark">P2</span></td><td><b>Régulariser la CMU</b><br><span class="muted">Déposer les déclarations et régler les cotisations en retard</span></td><td>Stoppe les majorations de retard</td><td>Sous 30 jours</td><td><span class="pill p-rh">Flow RH</span></td></tr>
+<tr><td><span class="bdg b-dark">P2</span></td><td><b>Plan de trésorerie à 13 semaines</b><br><span class="muted">Suivre encaissements et décaissements chaque semaine</span></td><td>Sortir du découvert (12,5 M)</td><td>Sous 30 jours</td><td><span class="pill p-compta">Flow Compta</span></td></tr>
+<tr><td><span class="bdg b-dark">P2</span></td><td><b>Ramener le délai clients à 60 jours</b><br><span class="muted">Relances systématiques et conditions de paiement écrites</span></td><td class="m" style="font-weight: 700">+24,4 M de trésorerie libérée</td><td>3 à 6 mois</td><td><span class="pill p-sell">Flow Sell</span></td></tr>
+<tr><td><span class="bdg b-acc">P3</span></td><td><b>Allonger le délai fournisseurs à 45 jours</b><br><span class="muted">Renégocier les échéances avec les principaux fournisseurs</span></td><td class="m" style="font-weight: 700">+10,2 M de trésorerie libérée</td><td>3 à 6 mois</td><td><span class="pill p-compta">Flow Compta</span></td></tr>
+<tr><td><span class="bdg b-acc">P3</span></td><td><b>Gagner 2 points de marge brute</b><br><span class="muted">Revoir prix de vente et conditions d’achat des produits phares</span></td><td class="m" style="font-weight: 700">+8,4 M d’EBE par an</td><td>6 à 12 mois</td><td><span class="pill p-sell">Flow Sell</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1.1fr; gap: 8px">
+<div class="box" style="padding: 10px 12px"><p class="micro" style="color: #785C03">0–3 mois</p><h3 style="font-size: 13px">Sécuriser</h3><ul style="margin: 6px 0 0; padding-left: 14px; font-size: 10.5px"><li>FNE activée</li><li>CMU régularisée</li><li>Plan de trésorerie en place</li></ul></div>
+<div class="box" style="padding: 10px 12px"><p class="micro" style="color: #785C03">3–6 mois</p><h3 style="font-size: 13px">Libérer du cash</h3><ul style="margin: 6px 0 0; padding-left: 14px; font-size: 10.5px"><li>Délai clients à 60 j</li><li>Délai fournisseurs à 45 j</li></ul></div>
+<div class="box" style="padding: 10px 12px"><p class="micro" style="color: #785C03">6–12 mois</p><h3 style="font-size: 13px">Rentabiliser la croissance</h3><ul style="margin: 6px 0 0; padding-left: 14px; font-size: 10.5px"><li>+2 points de marge brute</li><li>Maintenir l’endettement sous 50 %</li></ul></div>
+<div class="box" style="padding: 10px 12px; background: #000000; color: #FFFFFF; border-color: #000000"><p class="micro" style="color: #FFD700">Vos cibles</p>
+<div style="display: grid; grid-template-columns: 1fr auto auto; gap: 2px 8px; font-size: 10.5px; margin-top: 6px">
+<span style="color: #D4D4D4">Marge brute</span><span class="m">32 %</span><b class="m" style="color: #FFD700">34 %</b>
+<span style="color: #D4D4D4">EBE / CA</span><span class="m">4,0 %</span><b class="m" style="color: #FFD700">≥ 10 %</b>
+<span style="color: #D4D4D4">Délai clients</span><span class="m">78 j</span><b class="m" style="color: #FFD700">60 j</b>
+<span style="color: #D4D4D4">Trésorerie</span><span class="m">−12,5 M</span><b class="m" style="color: #FFD700">&gt; 0</b>
+</div></div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1.15fr 1fr; gap: 12px">
+<div class="box" style="background: #FEF9E7; border-color: #FFD700"><h2 class="sec">À savoir</h2>
+<ul style="margin: 8px 0 0; padding-left: 16px; display: grid; gap: 5px; font-size: 11px">
+<li><b>Impôt minimum forfaitaire :</b> votre IS théorique (2,1 M) est inférieur à l’IMF ; l’impôt dû correspond à l’IMF, soit 3,0 M. L’IS dépasse ce plancher au-delà de 12,0 M de résultat fiscal (estimation).</li>
+<li><b>TVA :</b> 18 % au taux normal, 9 % au taux réduit sur certains produits.</li>
+</ul></div>
+<div class="box"><h2 class="sec">Prochaines échéances</h2>
+<div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin-top: 8px; font-size: 10.5px">
+<b class="m">15 janv. 2027</b><span>TVA et ITS du mois de décembre</span>
+<b class="m">15 févr. 2027</b><span>Régularisation annuelle de l’ITS</span>
+<b class="m">15 avr. 2027</b><span>1er acompte d’impôt sur les bénéfices (puis 15 juin, 15 sept.)</span>
+<b class="m">30 mai 2027</b><span>Déclaration annuelle de résultat (30 juin si audit obligatoire)</span>
+</div></div>
+</div>
+
+<div style="background: #000000; color: #FFFFFF; border-radius: 16px; padding: 16px 18px; display: flex; gap: 16px; align-items: center; justify-content: space-between">
+<div><p class="micro" style="color: #FFD700">Votre entretien individuel</p><p class="d" style="font-weight: 800; font-size: 16px; margin-top: 4px">Passons ce plan en revue ensemble, au stand Check-up 360.</p><p style="color: #D4D4D4; font-size: 11px; margin-top: 4px">27 22 42 14 43 / 07 67 13 19 93 · portaildck.dc-knowing.com · infos@dc-knowing.com</p></div>
+<span style="background: #FFD700; color: #000000; padding: 8px 14px; border-radius: 12px; font-weight: 800; font-size: 12px; white-space: nowrap">Prendre rendez-vous</span>
+</div>
+
+<footer style="margin-top: auto; padding-top: 10px; border-top: 1px solid #E0E0E0; font-size: 9px; color: #525252; line-height: 1.5">
+<p><b style="color: #000000">Méthode et limites.</b> L’IA sert uniquement à extraire les données ; tous les calculs sont déterministes, selon le SYSCOHADA révisé. Hypothèse TVA 18 %. Les repères sont généraux et à adapter au secteur. Ce document ne constitue ni un audit, ni une certification des comptes, ni un avis juridique. Échéances valables pour les entreprises rattachées à un centre des impôts.</p>
+<p style="display: flex; justify-content: space-between; margin-top: 6px"><span>DC-KNOWING · Siège : Cocody Riviera 2, Collège André Malraux, Abidjan</span><span class="m">3 / 3</span></p>
+</footer>
+</section>
+</div>
+</body>
+</html>

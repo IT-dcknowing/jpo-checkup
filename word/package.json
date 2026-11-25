@@ -1,0 +1,8 @@
+{
+  "name": "rapport-diagnostic-jpo",
+  "private": true,
+  "dependencies": {
+    "docx": "9.8.1",
+    "@resvg/resvg-js": "2.6.2"
+  }
+}

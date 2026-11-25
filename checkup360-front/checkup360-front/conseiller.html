@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Check-up 360 — Espace conseillers DC-KNOWING</title>
+<link rel="icon" href="assets/img/logo-dc-knowing.png">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Sora:wght@600;700;800&amp;family=Poppins:ital,wght@0,500;0,700;0,800;0,900;1,400;1,500;1,700;1,800;1,900&amp;family=Mrs+Saint+Delafield&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/conseiller.css">
+</head>
+<body>
+<div id="app"></div>
+<script type="text/x-template" id="tpl-conseiller">
+<div class="jpo" style="min-height: 100vh; display: flex; flex-direction: column; font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif; color: #000000">
+
+<!-- ========== CONNEXION ========== -->
+<sc-if value="{{showLogin}}" hint-placeholder-val="{{true}}">
+<div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 16px">
+<form class="card glass up" onSubmit="{{login}}" noValidate="{{true}}" style="width: min(440px, 100%); padding: 32px; display: flex; flex-direction: column; gap: 18px" aria-labelledby="t-login">
+<div>
+<div style="display: flex; align-items: center; gap: 14px"><img src="assets/img/logo-dc-knowing.png" alt="DC-KNOWING — The bespoke partner" style="height: 36px; width: auto; display: block"><span aria-hidden="true" style="width: 1px; height: 40px; background: #E0E0E0"></span><span class="lockup"><span class="script" style="font-size: 28px; margin-bottom: -10px; position: relative; z-index: 1">Journées</span><span class="wm" style="font-size: 15px">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 92px; height: auto; display: block; margin-top: 2px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></span></div>
+<h1 id="t-login" style="font-size: 26px; margin-top: 22px">Espace conseiller</h1>
+<p class="muted" style="font-size: 14px; margin-top: 6px">Suivi des diagnostics Check-up 360 du jour et préparation des entretiens.</p>
+</div>
+<div class="fld"><label class="lbl" for="l-mail">E-mail professionnel</label><input id="l-mail" type="email" class="{{mailCls}}" value="{{lf.mail}}" onChange="{{onMail}}" placeholder="prenom.nom@dc-knowing.com" autoComplete="username"></div>
+<div class="fld"><label class="lbl" for="l-pw">Mot de passe</label>
+<div style="position: relative"><input id="l-pw" type="{{pwType}}" class="{{pwCls}}" value="{{lf.pw}}" onChange="{{onPw}}" autoComplete="current-password" style="padding-right: 48px"><button type="button" onClick="{{togglePw}}" aria-label="{{pwAria}}" style="position: absolute; right: 0; top: 0; width: 44px; height: 44px; border: 0; background: none; cursor: pointer; display: grid; place-items: center; border-radius: 14px; color: #000000"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg></button></div>
+</div>
+<sc-if value="{{loginErr}}" hint-placeholder-val="{{false}}"><p class="hint e" role="alert">{{loginErr}}</p></sc-if>
+<button type="submit" class="btn btn-p {{loginCls}}" style="width: 100%">Se connecter</button>
+<p class="hint" style="text-align: center">Accès réservé à l’équipe DC-KNOWING · session sécurisée</p>
+</form>
+</div>
+</sc-if>
+
+<!-- ========== TABLEAU DE BORD ========== -->
+<sc-if value="{{showDash}}" hint-placeholder-val="{{false}}">
+<header style="position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,0.92); backdrop-filter: blur(14px); border-bottom: 1px solid #E0E0E0">
+<div style="max-width: 1320px; margin: 0 auto; padding: 0 24px; min-height: 68px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
+<a href="index.html" style="text-decoration: none; color: #000000"><span style="display: flex; align-items: center; gap: 14px"><img src="assets/img/logo-dc-knowing.png" alt="DC-KNOWING — The bespoke partner" style="height: 34px; width: auto; display: block"><span aria-hidden="true" style="width: 1px; height: 40px; background: #E0E0E0"></span><span class="lockup"><span class="script" style="font-size: 28px; margin-bottom: -10px; position: relative; z-index: 1">Journées</span><span class="wm" style="font-size: 15px">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 92px; height: auto; display: block; margin-top: 2px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></span></span></a>
+<nav aria-label="Jour de l’événement" style="display: flex; gap: 4px; padding: 4px; border: 1px solid #E0E0E0; border-radius: 14px; background: #FFFFFF">
+<sc-for list="{{days}}" as="d" hint-placeholder-count="3"><button type="button" class="{{d.cls}}" aria-pressed="{{d.pressed}}" onClick="{{d.pick}}">{{d.l}}</button></sc-for>
+</nav>
+<div style="margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+<span class="bdg b-run"><span class="dot y"></span>Flux en direct</span>
+<span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600"><span class="m" style="width: 32px; height: 32px; border-radius: 50%; background: #000000; color: #FFD700; display: grid; place-items: center; font-size: 12px">{{initials}}</span>{{userName}}</span>
+<button type="button" class="btn btn-g btn-sm" onClick="{{askLogout}}">Déconnexion</button>
+</div>
+</div>
+</header>
+
+<main style="flex: 1; max-width: 1320px; width: 100%; margin: 0 auto; padding: 28px 24px 48px; display: flex; flex-direction: column; gap: 22px">
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap">
+<div><p class="micro">{{dayLong}}</p><h1 style="font-size: clamp(1.6rem, 3vw, 2.25rem); margin-top: 6px">Diagnostics du jour</h1></div>
+<div style="display: flex; gap: 10px; flex-wrap: wrap">
+<button type="button" class="btn btn-g btn-sm" onClick="{{exportCsv}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"></path></svg>Exporter la liste</button>
+<a class="btn btn-a btn-sm" href="index.html"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nouveau dépôt au stand</a>
+</div>
+</div>
+
+<section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px" aria-label="Indicateurs du jour">
+<div class="card up" style="padding: 18px; display: flex; flex-direction: column; gap: 8px"><span class="micro muted">Dépôts</span><span class="m" style="font-size: 30px; font-weight: 700; line-height: 1">{{stats.total}}<span style="font-size: 15px; color: #525252"> / 15</span></span><div class="bar"><i style="width: {{stats.capPct}}%"></i></div><span class="hint">Capacité prévue par jour</span></div>
+<div class="card up d1" style="padding: 18px; display: flex; flex-direction: column; gap: 8px"><span class="micro muted">Rapports envoyés</span><span class="m" style="font-size: 30px; font-weight: 700; line-height: 1; color: #15803D">{{stats.sent}}</span><span class="hint">Délai moyen {{stats.avg}}</span></div>
+<div class="card up d2" style="padding: 18px; display: flex; flex-direction: column; gap: 8px; background: #FEF9E7; border-color: #FFD700"><span class="micro" style="color: #785C03; display: flex; align-items: center; gap: 8px"><span class="dot y"></span>En cours</span><span class="m" style="font-size: 30px; font-weight: 700; line-height: 1">{{stats.run}}</span><span class="hint">Mis à jour en temps réel</span></div>
+<div class="card up d3" style="padding: 18px; display: flex; flex-direction: column; gap: 8px"><span class="micro muted">Erreurs à rappeler</span><span class="m" style="font-size: 30px; font-weight: 700; line-height: 1; color: #DC2626">{{stats.err}}</span><span class="hint">Lecture impossible · rappel conseiller</span></div>
+<div class="card up d4 dk" style="padding: 18px; display: flex; flex-direction: column; gap: 8px; background: #000000; color: #FFFFFF; border-color: #000000"><span class="micro" style="color: #FFD700">Scores moyens</span><span class="m" style="font-size: 22px; font-weight: 700; line-height: 1.2">P {{stats.p}} · C {{stats.c}}</span><span class="hint" style="color: #D4D4D4">Performance · Conformité /100</span></div>
+</section>
+
+<section class="card" style="padding: 18px; display: flex; flex-direction: column; gap: 14px" aria-labelledby="h-liste">
+<h2 id="h-liste" class="micro">Liste des dépôts</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+<div role="group" aria-label="Filtrer par statut" style="display: flex; gap: 8px; flex-wrap: wrap">
+<sc-for list="{{chips}}" as="c" hint-placeholder-count="4"><button type="button" class="{{c.cls}}" aria-pressed="{{c.pressed}}" onClick="{{c.pick}}">{{c.l}}<span class="n">{{c.n}}</span></button></sc-for>
+</div>
+<div style="margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; flex: 1 1 380px; justify-content: flex-end">
+<label style="position: relative; flex: 1 1 220px; max-width: 320px"><span style="position: absolute; left: 14px; top: 13px; color: #525252"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg></span><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0)">Rechercher</span><input class="in" value="{{q}}" onChange="{{onQ}}" placeholder="Entreprise ou référence" style="padding-left: 42px"></label>
+<label style="flex: 0 1 200px"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0)">Type de client</span><select class="in" value="{{typeF}}" onChange="{{onType}}"><option value="">Tous les clients</option><option value="ACTUEL">Clients actuels</option><option value="REACTIVER">À réactiver</option><option value="PROSPECT">Prospects</option></select></label>
+</div>
+</div>
+
+<sc-if value="{{hasRows}}" hint-placeholder-val="{{true}}">
+<div style="overflow-x: auto; border-radius: 16px; border: 1px solid #E0E0E0">
+<table class="t">
+<thead><tr><th scope="col">Heure</th><th scope="col">Entreprise</th><th scope="col">Type</th><th scope="col">Statut</th><th scope="col">Performance</th><th scope="col">Conformité</th><th scope="col">Données</th><th scope="col">Entretien</th><th scope="col"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0)">Actions</span></th></tr></thead>
+<tbody>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+<tr class="{{r.trCls}}">
+<td class="m" style="font-size: 13px; color: #525252">{{r.heure}}</td>
+<td><button type="button" class="rowbtn" onClick="{{r.open}}">{{r.nom}}</button><span class="m" style="display: block; font-size: 11px; color: #525252">{{r.ref}} · {{r.secteur}}</span></td>
+<td><span class="bdg {{r.typeCls}}">{{r.typeL}}</span></td>
+<td style="min-width: 160px">
+<span class="bdg {{r.stCls}}"><sc-if value="{{r.running}}" hint-placeholder-val="{{false}}"><span class="spin" style="width: 10px; height: 10px; border-width: 2px"></span></sc-if>{{r.stL}}</span>
+<sc-if value="{{r.running}}" hint-placeholder-val="{{false}}"><div class="bar" style="margin-top: 6px; height: 5px"><i class="stripes" style="width: {{r.prog}}%"></i></div></sc-if>
+</td>
+<td><sc-if value="{{r.hasScore}}" hint-placeholder-val="{{true}}"><span style="display: inline-flex; align-items: center; gap: 8px"><b class="m">{{r.perf}}</b><span class="bdg {{r.gpCls}}" style="padding: 1px 8px">{{r.gp}}</span></span></sc-if><sc-if value="{{r.noScore}}" hint-placeholder-val="{{false}}"><span class="muted">—</span></sc-if></td>
+<td><sc-if value="{{r.hasScore}}" hint-placeholder-val="{{true}}"><span style="display: inline-flex; align-items: center; gap: 8px"><b class="m">{{r.conf}}</b><span class="bdg {{r.gcCls}}" style="padding: 1px 8px">{{r.gc}}</span></span></sc-if><sc-if value="{{r.noScore}}" hint-placeholder-val="{{false}}"><span class="muted">—</span></sc-if></td>
+<td class="m" style="font-size: 13px">{{r.couvL}}<sc-if value="{{r.indicatif}}" hint-placeholder-val="{{false}}"><span class="bdg b-warn" style="margin-left: 6px; font-family: 'Plus Jakarta Sans', sans-serif; padding: 1px 8px">indicatif</span></sc-if></td>
+<td style="font-size: 13px; font-weight: 600">{{r.entL}}</td>
+<td><button type="button" class="btn btn-g btn-sm" onClick="{{r.open}}" aria-label="{{r.openL}}">Détails</button></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</sc-if>
+<sc-if value="{{noRows}}" hint-placeholder-val="{{false}}">
+<div style="padding: 48px 16px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; border: 2px dashed #E0E0E0; border-radius: 16px">
+<span style="width: 56px; height: 56px; border-radius: 16px; background: #FEF9E7; border: 1px solid #FFD700; display: grid; place-items: center"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 26px; height: 26px"><rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16"></path></svg></span>
+<h3 style="font-size: 18px">{{emptyTitle}}</h3>
+<p class="muted" style="font-size: 14px; max-width: 46ch">{{emptyText}}</p>
+<sc-if value="{{canReset}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-g btn-sm" onClick="{{resetFilters}}">Effacer les filtres</button></sc-if>
+</div>
+</sc-if>
+<p class="hint">Les noms réels sont visibles ici uniquement (colonnes chiffrées en base).</p>
+</section>
+</main>
+</sc-if>
+
+<!-- ========== PANNEAU DÉTAIL ========== -->
+<sc-if value="{{hasSel}}" hint-placeholder-val="{{false}}">
+<div class="ov" onClick="{{ovClick}}" onKeyDown="{{ovKey}}">
+<aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="t-drawer">
+<div style="padding: 20px 24px; border-bottom: 1px solid #E0E0E0; display: flex; gap: 12px; align-items: flex-start">
+<div style="flex: 1; min-width: 0">
+<p class="m" style="font-size: 12px; color: #525252">{{sel.ref}} · déposé à {{sel.heure}}</p>
+<h2 id="t-drawer" style="font-size: 22px; margin-top: 4px">{{sel.nom}}</h2>
+<div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px"><span class="bdg {{sel.stCls}}">{{sel.stL}}</span><span class="bdg {{sel.typeCls}}">{{sel.typeL}}</span><span class="bdg">{{sel.secteur}} · {{sel.effectif}} sal.</span></div>
+</div>
+<button type="button" class="btn btn-g btn-ic btn-sm" onClick="{{closeSel}}" aria-label="Fermer le détail" style="width: 36px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+</div>
+
+<div style="flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 20px">
+<sc-if value="{{sel.hasScore}}" hint-placeholder-val="{{true}}">
+<div class="up" style="display: flex; gap: 16px; flex-wrap: wrap">
+<div style="flex: 1 1 180px; display: flex; gap: 14px; align-items: center; padding: 14px; border: 1px solid #E0E0E0; border-radius: 18px"><div class="{{sel.ringPCls}}" style="--sz: 76px; --p: {{sel.perf}}" role="img" aria-label="{{sel.perfAria}}"><b>{{sel.perf}}</b></div><div><p class="micro muted">Performance</p><p class="d" style="font-weight: 800; font-size: 20px">Grade {{sel.gp}}</p></div></div>
+<div style="flex: 1 1 180px; display: flex; gap: 14px; align-items: center; padding: 14px; border: 1px solid #E0E0E0; border-radius: 18px"><div class="ring" style="--sz: 76px; --p: {{sel.conf}}" role="img" aria-label="{{sel.confAria}}"><b>{{sel.conf}}</b></div><div><p class="micro muted">Conformité</p><p class="d" style="font-weight: 800; font-size: 20px">Grade {{sel.gc}}</p></div></div>
+</div>
+<p style="font-size: 13px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><b>Données exploitées : <span class="m">{{sel.couvL}}</span></b><sc-if value="{{sel.indicatif}}" hint-placeholder-val="{{false}}"><span class="bdg b-warn">Score indicatif</span></sc-if></p>
+</sc-if>
+
+<sc-if value="{{sel.running}}" hint-placeholder-val="{{false}}">
+<div style="padding: 16px; border-radius: 16px; background: #FEF9E7; border: 1px solid #FFD700; display: flex; flex-direction: column; gap: 10px">
+<p style="font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px"><span class="spin"></span>Traitement en cours : {{sel.stL}}</p>
+<div class="bar" style="height: 10px; border: 1px solid #000000"><i class="stripes" style="width: {{sel.prog}}%"></i></div>
+<div class="sk" style="width: 80%"></div><div class="sk" style="width: 55%"></div>
+</div>
+</sc-if>
+
+<sc-if value="{{sel.isErr}}" hint-placeholder-val="{{false}}">
+<div style="padding: 16px; border-radius: 16px; background: #FEE2E2; border: 1px solid #F6C7C7; display: flex; flex-direction: column; gap: 10px">
+<p style="font-size: 14px"><b>Lecture impossible.</b> {{sel.errMsg}} Aucun rapport automatique ; e-mail d’excuse envoyé.</p>
+<div style="display: flex; gap: 8px; flex-wrap: wrap"><button type="button" class="btn btn-p btn-sm {{retryCls}}" onClick="{{retry}}">Relancer le traitement</button><button type="button" class="btn btn-g btn-sm" onClick="{{callClient}}">Noter le rappel effectué</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{sel.hasAlerts}}" hint-placeholder-val="{{false}}">
+<div><h3 class="micro" style="font-family: 'Plus Jakarta Sans', sans-serif">Alertes</h3>
+<ul style="list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px">
+<sc-for list="{{sel.alertes}}" as="a" hint-placeholder-count="2"><li style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px"><span class="bdg {{a.cls}}" style="padding: 1px 8px">{{a.niv}}</span><span>{{a.t}}</span></li></sc-for>
+</ul></div>
+</sc-if>
+
+<sc-if value="{{sel.hasPlan}}" hint-placeholder-val="{{false}}">
+<div><h3 class="micro" style="font-family: 'Plus Jakarta Sans', sans-serif">Plan d’action</h3>
+<ol style="list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px">
+<sc-for list="{{sel.plan}}" as="p" hint-placeholder-count="3"><li style="display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid #E0E0E0; border-radius: 12px; font-size: 13px; flex-wrap: wrap"><span class="bdg {{p.cls}}" style="padding: 1px 8px">{{p.prio}}</span><b style="flex: 1; min-width: 160px">{{p.a}}</b><span class="pill {{p.mod}}">{{p.modL}}</span></li></sc-for>
+</ol></div>
+</sc-if>
+
+<div><h3 class="micro" style="font-family: 'Plus Jakarta Sans', sans-serif">Historique</h3>
+<ol style="list-style: none; margin: 10px 0 0; padding: 0 0 0 4px; display: grid; gap: 0">
+<sc-for list="{{sel.hist}}" as="h" hint-placeholder-count="4"><li style="display: flex; gap: 12px; align-items: flex-start; padding-bottom: 10px; position: relative"><span style="width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; flex: none; background: {{h.c}}; border: 2px solid #000000"></span><span class="m" style="font-size: 12px; color: #525252; width: 44px; flex: none">{{h.t}}</span><span style="font-size: 13px">{{h.l}}</span></li></sc-for>
+</ol></div>
+
+<div><h3 class="micro" style="font-family: 'Plus Jakarta Sans', sans-serif">Journal d’audit</h3>
+<ul style="list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px">
+<sc-for list="{{sel.audit}}" as="a" hint-placeholder-count="2"><li class="m" style="font-size: 12px; color: #525252">{{a}}</li></sc-for>
+</ul></div>
+</div>
+
+<div style="padding: 16px 24px; border-top: 1px solid #E0E0E0; display: flex; gap: 10px; flex-wrap: wrap">
+<sc-if value="{{sel.hasScore}}" hint-placeholder-val="{{true}}"><button type="button" class="btn btn-a" onClick="{{openReport}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>Ouvrir le rapport</button>
+<button type="button" class="btn btn-g {{resendCls}}" onClick="{{resend}}">Renvoyer l’e-mail</button>
+<button type="button" class="btn btn-p" onClick="{{markDone}}" disabled="{{sel.entDone}}">{{sel.entBtn}}</button></sc-if>
+<sc-if value="{{sel.noScore}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-g" onClick="{{closeSel}}">Fermer</button></sc-if>
+</div>
+</aside>
+</div>
+</sc-if>
+
+<sc-if value="{{showLogoutModal}}" hint-placeholder-val="{{false}}">
+<div class="ovc" onClick="{{ovcClick}}">
+<div class="mdl" role="dialog" aria-modal="true" aria-labelledby="t-out">
+<div class="mh"><h3 id="t-out" style="font-size: 18px">Se déconnecter ?</h3></div>
+<div class="mb muted">Les traitements en cours continuent sur le serveur ; vous les retrouverez à la reconnexion.</div>
+<div class="mf"><button type="button" class="btn btn-g" onClick="{{cancelLogout}}">Rester connecté</button><button type="button" class="btn btn-p" onClick="{{logout}}">Se déconnecter</button></div>
+</div>
+</div>
+</sc-if>
+
+<div class="toasts" aria-live="polite">
+<sc-for list="{{toasts}}" as="t" hint-placeholder-count="0">
+<div class="toast {{t.cls}}" role="status">
+<sc-if value="{{t.ok}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l5 5L20 6"></path></svg></sc-if>
+<sc-if value="{{t.bad}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5M12 16h.01"></path><circle cx="12" cy="12" r="9"></circle></svg></sc-if>
+<sc-if value="{{t.info}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8h.01M11 12h1v5h1"></path></svg></sc-if>
+<div style="flex: 1; min-width: 0"><b style="display: block">{{t.title}}</b><span style="font-size: 13px; color: #262626">{{t.text}}</span></div>
+</div>
+</sc-for>
+</div>
+</div>
+
+</script>
+<script src="config.js"></script>
+<script src="assets/js/vendor/preact.min.js"></script>
+<script src="assets/js/dc-runtime.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/app-conseiller.js"></script>
+<script>DC.mount(Component, 'tpl-conseiller', document.getElementById('app'), DC.queryProps());</script>
+</body>
+</html>

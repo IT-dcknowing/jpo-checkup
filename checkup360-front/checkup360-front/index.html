@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Check-up 360 — Journées Portes Ouvertes DC-KNOWING</title>
+<meta name="description" content="Diagnostic financier et conformité pendant les Journées Portes Ouvertes DC-KNOWING, 16–18 décembre 2026, Abidjan.">
+<link rel="icon" href="assets/img/logo-dc-knowing.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Sora:wght@600;700;800&amp;family=Poppins:ital,wght@0,500;0,700;0,800;0,900;1,400;1,500;1,700;1,800;1,900&amp;family=Mrs+Saint+Delafield&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/jpo.css">
+</head>
+<body>
+<div id="app"></div>
+<noscript><p style="padding:24px;font-family:sans-serif">Ce site nécessite JavaScript.</p></noscript>
+
+<!-- Gabarit de l'application (lu par assets/js/dc-runtime.js) -->
+<script type="text/x-template" id="tpl-visiteur">
+<div class="jpo" style="min-height: 100vh; display: flex; flex-direction: column; font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif; color: #000000">
+
+<!-- ========== EN-TÊTE ========== -->
+<header style="position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,0.92); backdrop-filter: blur(14px); border-bottom: 1px solid #E0E0E0">
+<div style="max-width: 1200px; margin: 0 auto; padding: 0 24px; min-height: 72px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
+<button type="button" onClick="{{goHome}}" aria-label="Accueil des Journées Portes Ouvertes" style="background: none; border: 0; padding: 4px 0; cursor: pointer; text-align: left; color: #000000; border-radius: 8px">
+<span style="display: flex; align-items: center; gap: 14px"><img src="assets/img/logo-dc-knowing.png" alt="DC-KNOWING — The bespoke partner" style="height: 34px; width: auto; display: block"><span aria-hidden="true" style="width: 1px; height: 40px; background: #E0E0E0"></span><span class="lockup"><span class="script" style="font-size: 28px; margin-bottom: -10px; position: relative; z-index: 1">Journées</span><span class="wm" style="font-size: 15px">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 92px; height: auto; display: block; margin-top: 2px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></span></span>
+</button>
+<nav aria-label="Navigation principale" style="margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+<button type="button" class="navbtn" onClick="{{openProgramme}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16"></path></svg>Programme</button>
+<button type="button" class="{{mesCls}}" onClick="{{openEspace}}" aria-current="{{mesCurrent}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Mes diagnostics<sc-if value="{{hasDiags}}" hint-placeholder-val="{{false}}"><span class="cnt">{{diagCount}}</span></sc-if></button>
+<sc-if value="{{headerCta}}" hint-placeholder-val="{{true}}"><button type="button" class="btn btn-a btn-sm" onClick="{{start}}" style="margin-left: 6px">Faire mon diagnostic</button></sc-if>
+<sc-if value="{{logged}}" hint-placeholder-val="{{false}}">
+<span style="display: inline-flex; align-items: center; gap: 8px; margin-left: 6px; padding-left: 12px; border-left: 1px solid #E0E0E0"><span class="avatar" aria-hidden="true">{{initials}}</span><span style="font-size: 12px; font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{userEmail}}</span></span>
+<button type="button" class="btn btn-t btn-sm" onClick="{{askLogout}}">Déconnexion</button>
+</sc-if>
+</nav>
+</div>
+</header>
+
+<main style="flex: 1; width: 100%">
+
+<!-- ========== ÉCRAN 1 : ACCUEIL ========== -->
+<sc-if value="{{show.accueil}}" hint-placeholder-val="{{true}}">
+<div style="max-width: 1200px; margin: 0 auto; padding: 56px 24px 0; position: relative">
+<section style="display: flex; flex-wrap: wrap; gap: 48px; align-items: center" aria-labelledby="h-hero">
+<div class="up" style="flex: 1 1 520px; min-width: 0">
+<p style="font-family: Poppins, sans-serif; font-style: italic; font-size: 17px">Le cabinet DC-KNOWING vous invite aux</p>
+<div class="lockup" aria-hidden="true" style="margin-top: 6px"><span class="script" style="font-size: clamp(4.5rem, 9vw, 7.5rem); margin-bottom: -0.36em; margin-left: 1.2em; position: relative; z-index: 1; width: 447px; height: 153px">Journées</span><span class="wm" style="font-size: clamp(2.6rem, 5.6vw, 4.5rem)">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 62%; height: auto; display: block; margin-top: 6px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></div>
+<h1 id="h-hero" style="font-size: clamp(1.6rem, 2.8vw, 2.2rem); line-height: 1.15; margin-top: 22px; font-family: Poppins, Sora, sans-serif; font-weight: 800">Votre diagnostic Check-up 360 en 10 minutes</h1>
+<p style="font-size: 18px; color: #525252; max-width: 56ch; margin-top: 12px; line-height: 1.55">Déposez vos documents comptables et recevez par e-mail un rapport PDF de 3 pages : santé financière, conformité fiscale et sociale, plan d’action priorisé et orientation à 12 mois.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px">
+<button type="button" class="btn btn-a btn-lg" onClick="{{start}}">Faire mon diagnostic<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+<a class="btn btn-g btn-lg" href="#etapes">Comment ça marche ?</a>
+</div>
+<p style="margin-top: 14px; font-size: 14px">Déjà fait votre diagnostic ? <button type="button" class="btn btn-t btn-sm" onClick="{{openEspace}}" style="text-decoration: underline; text-decoration-color: #FFD700; text-decoration-thickness: 2px; padding: 0 6px">Retrouver mes diagnostics</button></p>
+<div style="display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 24px; font-size: 14px; font-weight: 600">
+<span style="display: inline-flex; align-items: center; gap: 8px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>Données anonymisées avant analyse</span>
+<span style="display: inline-flex; align-items: center; gap: 8px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Rapport en 10 minutes maximum</span>
+<span style="display: inline-flex; align-items: center; gap: 8px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l5 5L20 6"></path></svg>Entretien avec un conseiller</span>
+</div>
+</div>
+
+<div class="up d2" style="flex: 1 1 380px; min-width: 0; display: flex; justify-content: center">
+
+</div>
+</section>
+
+<section style="padding-top: 72px; display: flex; flex-wrap: wrap; gap: 32px; align-items: center; justify-content: space-between" aria-labelledby="h-dates">
+<h2 id="h-dates" class="vh">Dates et lieu</h2>
+<div style="display: flex; gap: 28px; flex-wrap: wrap">
+<div class="dcard"><span class="dlab">Mercredi</span><span class="dnum dark">16</span><span class="dtime">08H30</span></div>
+<div class="dcard"><span class="dlab">Jeudi</span><span class="dnum light">17</span><span class="dtime">10H30</span></div>
+<div class="dcard"><span class="dlab">Vendredi</span><span class="dnum dark">18</span><span class="dtime">08H30</span></div>
+</div>
+<div style="display: flex; gap: 14px; align-items: center; text-align: right; margin-left: auto">
+<div><p style="font-family: Poppins, sans-serif; font-weight: 800; font-style: italic; font-size: 20px">Siège du Cabinet DC KNOWING</p><p style="font-family: Poppins, sans-serif; font-style: italic; font-size: 16px">Cocody Riviera 2, Collège André Malraux</p><p class="muted" style="font-size: 13px; margin-top: 4px">Décembre 2026</p></div>
+<svg viewBox="0 0 24 24" aria-hidden="true" style="width: 48px; height: 48px; flex: none"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 12 7 12s7-7 7-12a7 7 0 0 0-7-7z" fill="#000000"></path><circle cx="12" cy="9" r="2.6" fill="#FFFFFF"></circle></svg>
+</div>
+</section>
+
+<section id="etapes" style="padding-top: 88px" aria-labelledby="h-etapes">
+<p class="micro">Le parcours</p>
+<h2 id="h-etapes" style="font-size: 28px; margin-top: 8px">Trois étapes, sans rendez-vous</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 24px">
+<article class="card lift up d1" style="padding: 24px; display: flex; flex-direction: column; gap: 10px">
+<span class="m" style="width: 44px; height: 44px; display: grid; place-items: center; background: #FFD700; border: 1px solid #000000; border-radius: 12px; font-weight: 700; font-size: 18px">01</span>
+<h3 style="font-size: 18px">Identifiez-vous par e-mail</h3>
+<p class="muted" style="font-size: 14px">Un code à 6 chiffres, pas de mot de passe. Vos rapports sont ensuite rangés dans « Mes diagnostics ».</p>
+</article>
+<article class="card lift up d2" style="padding: 24px; display: flex; flex-direction: column; gap: 10px">
+<span class="m" style="width: 44px; height: 44px; display: grid; place-items: center; background: #FFD700; border: 1px solid #000000; border-radius: 12px; font-weight: 700; font-size: 18px">02</span>
+<h3 style="font-size: 18px">Répondez et déposez vos fichiers</h3>
+<p class="muted" style="font-size: 14px">6 étapes courtes, puis la balance générale, le compte de résultat ou le bilan (CSV, XLSX ou PDF).</p>
+</article>
+<article class="card lift up d3" style="padding: 24px; display: flex; flex-direction: column; gap: 10px">
+<span class="m" style="width: 44px; height: 44px; display: grid; place-items: center; background: #000000; color: #FFD700; border-radius: 12px; font-weight: 700; font-size: 18px">03</span>
+<h3 style="font-size: 18px">Recevez votre rapport</h3>
+<p class="muted" style="font-size: 14px">PDF de 3 pages par e-mail et dans « Mes diagnostics », puis entretien individuel avec un conseiller.</p>
+</article>
+</div>
+</section>
+
+<section style="padding-top: 72px" aria-labelledby="h-contenu">
+<p class="micro">Ce que vous recevez</p>
+<h2 id="h-contenu" style="font-size: 28px; margin-top: 8px">Un rapport de 3 pages, prêt pour l’entretien</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 24px">
+<article class="card" style="padding: 24px">
+<span class="bdg b-acc">Page 1</span>
+<h3 style="font-size: 18px; margin-top: 12px">Synthèse</h3>
+<ul style="margin: 10px 0 0; padding-left: 18px; font-size: 14px; color: #525252; display: grid; gap: 4px">
+<li>Score de performance et score de conformité sur 100</li><li>8 indicateurs clés avec feux vert, orange, rouge</li><li>Ce qui va bien, ce qui doit être traité</li>
+</ul>
+</article>
+<article class="card" style="padding: 24px">
+<span class="bdg b-acc">Page 2</span>
+<h3 style="font-size: 18px; margin-top: 12px">Santé financière</h3>
+<ul style="margin: 10px 0 0; padding-left: 18px; font-size: 14px; color: #525252; display: grid; gap: 4px">
+<li>Du chiffre d’affaires au résultat net</li><li>Délais clients et fournisseurs, BFR</li><li>Structure du bilan et 7 ratios commentés</li>
+</ul>
+</article>
+<article class="card" style="padding: 24px">
+<span class="bdg b-acc">Page 3</span>
+<h3 style="font-size: 18px; margin-top: 12px">Conformité &amp; plan d’action</h3>
+<ul style="margin: 10px 0 0; padding-left: 18px; font-size: 14px; color: #525252; display: grid; gap: 4px">
+<li>Obligations fiscales et sociales, FNE</li><li>Jusqu’à 6 actions priorisées et chiffrées</li><li>Orientation à 12 mois et prochaines échéances</li>
+</ul>
+</article>
+</div>
+</section>
+
+<section class="dk" style="margin-top: 72px; background: #000000; color: #FFFFFF; border-radius: 24px; padding: 32px; display: flex; flex-wrap: wrap; gap: 24px; align-items: center; justify-content: space-between" aria-labelledby="h-conf">
+<div style="flex: 1 1 460px; min-width: 0">
+<p class="micro" style="color: #FFD700">Confidentialité · loi n°2013-450</p>
+<h2 id="h-conf" style="font-size: 24px; color: #FFFFFF; margin-top: 8px">Vos chiffres restent les vôtres</h2>
+<p style="color: #D4D4D4; font-size: 15px; margin-top: 10px; max-width: 62ch">Noms, NCC, RIB et téléphones sont remplacés avant toute analyse. Les fichiers bruts sont supprimés après 24 h ; le rapport est conservé 30 jours, chiffré. L’IA extrait les données, les calculs sont faits par notre moteur.</p>
+</div>
+<div style="display: flex; gap: 12px; flex-wrap: wrap">
+<button type="button" class="btn btn-l" onClick="{{openNotice}}">Lire la notice d’information</button>
+<button type="button" class="btn btn-a" onClick="{{start}}">Commencer</button>
+</div>
+</section>
+
+<section style="padding: 72px 0 0" aria-labelledby="h-flow">
+<div class="card glass" style="padding: 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between">
+<div>
+<p class="micro">Outils concernés par votre plan d’action</p>
+<h2 id="h-flow" style="font-size: 20px; margin-top: 6px">L’écosystème La Suite Flow</h2>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<span class="pill p-sell">Flow Sell</span><span class="pill p-rh">Flow RH</span><span class="pill p-compta">Flow Compta</span><span class="pill p-legal">Flow Legal</span><span class="pill p-task">Flow Task</span>
+</div>
+</div>
+</section>
+<div class="card glass float" style="width: 472px; max-width: 440px; padding: 24px; display: flex; flex-direction: column; gap: 18px; position: absolute; left: 778px; top: 113px; margin: 0px; height: 488px">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+<span class="micro">Aperçu du rapport · page 1</span>
+<span class="bdg b-acc">Exemple</span>
+</div>
+<div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><div class="ring gold anim" style="--sz: 96px; --p: 50" role="img" aria-label="Performance 50 sur 100"><b>50</b></div><span style="font-size: 12px; font-weight: 700">Performance · C</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><div class="ring anim" style="--sz: 96px; --p: 75" role="img" aria-label="Conformité 75 sur 100"><b>75</b></div><span style="font-size: 12px; font-weight: 700">Conformité · B</span></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; font-size: 13px">
+<div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #E0E0E0; border-radius: 12px; background: #FFFFFF"><span class="feu" style="background: #15803D"></span>CA <b class="m" style="margin-left: auto">+5,0 %</b></div>
+<div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #E0E0E0; border-radius: 12px; background: #FFFFFF"><span class="feu" style="background: #D97706"></span>Marge <b class="m" style="margin-left: auto">32 %</b></div>
+<div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #E0E0E0; border-radius: 12px; background: #FFFFFF"><span class="feu" style="background: #DC2626"></span>Trésorerie <b class="m" style="margin-left: auto">−12,5 M</b></div>
+<div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #E0E0E0; border-radius: 12px; background: #FFFFFF"><span class="feu" style="background: #D97706"></span>Clients <b class="m" style="margin-left: auto">78 j</b></div>
+</div>
+<div>
+<p style="font-size: 12px; font-weight: 700; margin-bottom: 6px">Pour 100 FCFA vendus, où va votre argent ?</p>
+<div style="display: flex; height: 14px; border-radius: 999px; overflow: hidden; border: 1px solid #000000">
+<span style="width: 68%; background: #000000"></span><span style="width: 22%; background: #FFD700"></span><span style="width: 6%; background: #525252"></span><span style="width: 4%; background: #FEF9E7"></span>
+</div>
+<p class="hint" style="margin-top: 6px">Achats 68 · Personnel 22 · Autres charges 6 · Reste 4</p>
+</div>
+</div></div>
+</sc-if>
+
+<!-- ========== CONNEXION PAR CODE ========== -->
+<sc-if value="{{show.auth}}" hint-placeholder-val="{{false}}">
+<div style="max-width: 1040px; margin: 0 auto; padding: 56px 24px 0; display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start">
+<div style="flex: 1 1 380px; min-width: 0" class="up">
+<button type="button" class="btn btn-t btn-sm" onClick="{{authBack}}" style="margin-left: -12px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>{{authBackL}}</button>
+<p class="micro" style="margin-top: 20px">{{authKicker}}</p>
+<h1 style="font-size: clamp(2rem, 3.6vw, 2.8rem); margin-top: 10px; font-family: Poppins, Sora, sans-serif; font-weight: 800">{{authTitle}}</h1>
+<p style="font-size: 17px; color: #525252; margin-top: 12px; max-width: 46ch">{{authLead}}</p>
+<ol style="list-style: none; margin: 28px 0 0; padding: 0; display: grid; gap: 14px">
+<li style="display: flex; gap: 14px; align-items: flex-start"><span class="m" style="width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; flex: none; background: {{a1bg}}; color: {{a1fg}}; border: 1px solid #000000">1</span><div><b>Votre e-mail professionnel</b><p class="hint">Il sert d’identifiant : pas de mot de passe à retenir.</p></div></li>
+<li style="display: flex; gap: 14px; align-items: flex-start"><span class="m" style="width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; flex: none; background: {{a2bg}}; color: {{a2fg}}; border: 1px solid #000000">2</span><div><b>Le code à 6 chiffres reçu par e-mail</b><p class="hint">Copiez-le, collez-le, validez. Il expire après 10 minutes.</p></div></li>
+<li style="display: flex; gap: 14px; align-items: flex-start"><span class="m" style="width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; flex: none; background: #FFFFFF; color: #525252; border: 1px solid #E0E0E0">3</span><div><b>{{authStep3}}</b><p class="hint">{{authStep3d}}</p></div></li>
+</ol>
+</div>
+
+<div style="flex: 1 1 400px; min-width: 0">
+<sc-if value="{{authEmailStep}}" hint-placeholder-val="{{true}}">
+<form class="card glass up d1" onSubmit="{{sendCode}}" noValidate="{{true}}" style="padding: 32px; display: flex; flex-direction: column; gap: 18px" aria-labelledby="t-mail">
+<span style="width: 56px; height: 56px; border-radius: 16px; background: #FFD700; border: 1px solid #000000; display: grid; place-items: center"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 26px; height: 26px"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 7l9 6 9-6"></path></svg></span>
+<h2 id="t-mail" style="font-size: 22px">Quelle est votre adresse e-mail ?</h2>
+<div class="fld"><label class="lbl" for="a-mail">E-mail professionnel</label><input id="a-mail" type="email" class="{{authMailCls}}" value="{{auth.email}}" onChange="{{onAuthEmail}}" placeholder="direction@entreprise.ci" autoComplete="email" aria-invalid="{{authMailInv}}"><sc-if value="{{auth.err}}" hint-placeholder-val="{{false}}"><span class="hint e" role="alert">{{auth.err}}</span></sc-if></div>
+<button type="submit" class="btn btn-p btn-lg {{authBusyCls}}" style="width: 100%">Recevoir mon code<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+<p class="hint" style="display: flex; gap: 8px; align-items: flex-start"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px; margin-top: 1px"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>Votre e-mail sert uniquement à vous envoyer le code et votre rapport.</p>
+</form>
+</sc-if>
+
+<sc-if value="{{authCodeStep}}" hint-placeholder-val="{{false}}">
+<form class="card glass up" onSubmit="{{verifyCode}}" noValidate="{{true}}" style="padding: 32px; display: flex; flex-direction: column; gap: 18px" aria-labelledby="t-code">
+<span style="width: 56px; height: 56px; border-radius: 16px; background: #000000; color: #FFD700; display: grid; place-items: center"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 26px; height: 26px"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></span>
+<div><h2 id="t-code" style="font-size: 22px">Saisissez le code reçu</h2>
+<p style="font-size: 14px; color: #525252; margin-top: 6px">Envoyé à <b style="color: #000000">{{auth.email}}</b> · <button type="button" class="btn btn-t btn-sm" onClick="{{changeEmail}}" style="min-height: 28px; padding: 0 6px; text-decoration: underline; text-decoration-color: #FFD700; text-decoration-thickness: 2px">modifier</button></p></div>
+<div class="fld"><label class="lbl" for="a-code">Code à 6 chiffres</label><input id="a-code" class="{{otpCls}}" value="{{auth.code}}" onChange="{{onCode}}" inputMode="numeric" autoComplete="one-time-code" maxLength="6" placeholder="······" aria-invalid="{{codeInv}}" aria-describedby="h-code"><sc-if value="{{auth.err}}" hint-placeholder-val="{{false}}"><span id="h-code" class="hint e" role="alert">{{auth.err}}</span></sc-if></div>
+<button type="submit" class="btn btn-a btn-lg {{authBusyCls}}" style="width: 100%" disabled="{{codeIncomplete}}">Valider et continuer</button>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px">
+<span class="muted">Rien reçu ? Pensez aux courriers indésirables.</span>
+<button type="button" class="btn btn-g btn-sm" onClick="{{resend}}" disabled="{{resendWait}}">{{resendL}}</button>
+</div>
+<sc-if value="{{demo}}" hint-placeholder-val="{{false}}"><p style="padding: 10px 12px; border-radius: 12px; background: #FEF9E7; border: 1px dashed #F2C200; font-size: 12px"><b>Mode démo :</b> le code de démonstration est <span class="m" style="font-weight: 700">482913</span>.</p></sc-if>
+</form>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<!-- ========== FORMULAIRE EN 6 ÉTAPES COURTES ========== -->
+<sc-if value="{{show.form}}" hint-placeholder-val="{{false}}">
+<div style="max-width: 1200px; margin: 0 auto; padding: 28px 24px 0">
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+<button type="button" class="btn btn-t btn-sm" onClick="{{askQuit}}" style="margin-left: -12px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>Quitter</button>
+<div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap"><span class="saved"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M4 12l5 5L20 6"></path></svg>Brouillon enregistré</span><sc-if value="{{demo}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-g btn-sm" onClick="{{fillSample}}">Remplir avec un exemple</button></sc-if></div>
+</div>
+
+<nav aria-label="Étapes du diagnostic" style="margin-top: 18px">
+<ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center">
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="6">
+<li style="display: flex; align-items: center; gap: 8px">
+<button type="button" class="stp {{s.cls}}" onClick="{{s.go}}" disabled="{{s.dis}}" aria-current="{{s.ac}}">
+<span class="c"><sc-if value="{{s.done}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M4 12l5 5L20 6"></path></svg></sc-if><sc-if value="{{s.notDone}}" hint-placeholder-val="{{true}}">{{s.n}}</sc-if></span>
+<span>{{s.l}}</span>
+</button>
+<sc-if value="{{s.sep}}" hint-placeholder-val="{{true}}"><span aria-hidden="true" style="width: 20px; height: 2px; background: {{s.sepColor}}; border-radius: 2px"></span></sc-if>
+</li>
+</sc-for>
+</ol>
+<div class="bar" style="margin-top: 12px" role="progressbar" aria-label="Progression du diagnostic" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{stepPct}}"><i style="width: {{stepPct}}%"></i></div>
+</nav>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; margin-top: 24px">
+<form class="card" onSubmit="{{submitForm}}" noValidate="{{true}}" style="flex: 999 1 560px; min-width: 0; padding: 32px; display: flex; flex-direction: column; gap: 24px">
+<div>
+<p class="micro">Étape {{step}} sur 6 · {{remainForm}}</p>
+<h2 style="font-size: clamp(1.5rem, 2.6vw, 1.9rem); margin-top: 8px; font-family: Poppins, Sora, sans-serif; font-weight: 800">{{stepTitle}}</h2>
+<p class="muted" style="font-size: 15px; margin-top: 6px; max-width: 60ch">{{stepWhy}}</p>
+</div>
+
+<!-- 1 · Entreprise -->
+<sc-if value="{{show.s1}}" hint-placeholder-val="{{true}}">
+<div class="up" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px">
+<div class="fld" style="grid-column: 1 / -1"><label class="lbl" for="f-raison">Raison sociale</label><input id="f-raison" class="{{cls.raison}}" value="{{f.raison}}" onChange="{{on.raison}}" placeholder="Ex. Ivoire Négoce SARL" autoComplete="organization" aria-invalid="{{inv.raison}}"><sc-if value="{{err.raison}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.raison}}</span></sc-if></div>
+<div class="fld"><label class="lbl" for="f-secteur">Secteur d’activité</label><select id="f-secteur" class="{{cls.secteur}}" value="{{f.secteur}}" onChange="{{on.secteur}}" aria-invalid="{{inv.secteur}}"><option value="">Choisir un secteur…</option><sc-for list="{{secteurs}}" as="o" hint-placeholder-count="6"><option value="{{o}}">{{o}}</option></sc-for></select><sc-if value="{{err.secteur}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.secteur}}</span></sc-if><sc-if value="{{exempt}}" hint-placeholder-val="{{false}}"><span class="hint" style="color: #785C03; font-weight: 600">Secteur exempté de FNE : la question FNE ne vous sera pas posée.</span></sc-if></div>
+<div class="fld"><label class="lbl" for="f-eff">Effectif</label><input id="f-eff" type="number" min="1" inputMode="numeric" class="{{cls.effectif}}" value="{{f.effectif}}" onChange="{{on.effectif}}" placeholder="Nombre de salariés" aria-invalid="{{inv.effectif}}"><sc-if value="{{err.effectif}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.effectif}}</span></sc-if></div>
+<div class="fld" style="grid-column: 1 / -1"><label class="lbl" for="f-ncc">NCC <span class="opt">(facultatif)</span></label><input id="f-ncc" class="in m" value="{{f.ncc}}" onChange="{{on.ncc}}" placeholder="Numéro de compte contribuable" style="max-width: 320px"><span class="hint">Masqué avant toute analyse.</span></div>
+</div>
+</sc-if>
+
+<!-- 2 · Vous -->
+<sc-if value="{{show.s2}}" hint-placeholder-val="{{false}}">
+<div class="up" style="display: flex; flex-direction: column; gap: 20px">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px">
+<div class="fld"><label class="lbl" for="f-nom">Nom et prénom</label><input id="f-nom" class="{{cls.nom}}" value="{{f.nom}}" onChange="{{on.nom}}" placeholder="Ex. Aïcha Koné" autoComplete="name" aria-invalid="{{inv.nom}}"><sc-if value="{{err.nom}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.nom}}</span></sc-if></div>
+<div class="fld"><label class="lbl" for="f-tel">Téléphone mobile</label><input id="f-tel" type="tel" class="{{cls.tel}} m" value="{{f.tel}}" onChange="{{on.tel}}" placeholder="07 00 00 00 00" autoComplete="tel" aria-invalid="{{inv.tel}}"><sc-if value="{{err.tel}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.tel}}</span></sc-if><sc-if value="{{noErr.tel}}" hint-placeholder-val="{{true}}"><span class="hint">Seulement pour le rappel d’un conseiller.</span></sc-if></div>
+<div class="fld" style="grid-column: 1 / -1"><span class="lbl">E-mail du rapport</span><div style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 16px; border-radius: 14px; background: #FAFAF7; border: 1.5px solid #E0E0E0; font-size: 14px"><b style="flex: 1; overflow: hidden; text-overflow: ellipsis">{{userEmail}}</b><span class="bdg b-ok"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M4 12l5 5L20 6"></path></svg>Vérifié</span></div></div>
+</div>
+<div class="fld"><span class="lbl" id="l-type">Votre relation avec DC-KNOWING</span>
+<div role="group" aria-labelledby="l-type" style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{typeOpts}}" as="o" hint-placeholder-count="3"><button type="button" class="{{o.cls}}" aria-pressed="{{o.pressed}}" onClick="{{o.pick}}">{{o.l}}</button></sc-for></div>
+<sc-if value="{{err.typeClient}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.typeClient}}</span></sc-if></div>
+<div class="fld"><span class="lbl" id="l-jour">Jour de votre visite</span>
+<div role="group" aria-labelledby="l-jour" style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{jourOpts}}" as="o" hint-placeholder-count="3"><button type="button" class="{{o.cls}}" aria-pressed="{{o.pressed}}" onClick="{{o.pick}}">{{o.l}}</button></sc-for></div>
+<span class="hint">Siège DC-KNOWING, Cocody Riviera 2 · votre invitation sera à ce jour-là.</span></div>
+</div>
+</sc-if>
+
+<!-- 3 · Fiscalité -->
+<sc-if value="{{show.s3}}" hint-placeholder-val="{{false}}">
+<div class="up" style="display: flex; flex-direction: column; gap: 22px">
+<div class="fld"><span class="lbl" id="l-regime">Régime fiscal déclaré</span>
+<div role="group" aria-labelledby="l-regime" style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{regimeOpts}}" as="o" hint-placeholder-count="5"><button type="button" class="{{o.cls}}" aria-pressed="{{o.pressed}}" onClick="{{o.pick}}">{{o.l}}</button></sc-for></div>
+<span class="hint m">Repères CA HT : TEE 5–50 M · RME 50–200 M · Réel simplifié 200–500 M · Réel normal &gt; 500 M</span>
+<sc-if value="{{err.regime}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.regime}}</span></sc-if></div>
+<sc-if value="{{notExempt}}" hint-placeholder-val="{{true}}">
+<div class="fld"><span class="lbl" id="l-fne">Facture normalisée électronique (FNE)</span>
+<div role="group" aria-labelledby="l-fne" style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{fneOpts}}" as="o" hint-placeholder-count="4"><button type="button" class="{{o.cls}}" aria-pressed="{{o.pressed}}" onClick="{{o.pick}}">{{o.l}}</button></sc-for></div>
+<sc-if value="{{err.fne}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.fne}}</span></sc-if></div>
+</sc-if>
+<sc-if value="{{exempt}}" hint-placeholder-val="{{false}}"><p class="bdg b-acc" style="align-self: flex-start">FNE : non applicable, secteur exempté</p></sc-if>
+<div class="fld"><span class="lbl" id="l-tva">Votre activité est-elle exonérée de TVA ?</span>
+<div role="group" aria-labelledby="l-tva" style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{tvaOpts}}" as="o" hint-placeholder-count="2"><button type="button" class="{{o.cls}}" aria-pressed="{{o.pressed}}" onClick="{{o.pick}}">{{o.l}}</button></sc-for></div>
+<sc-if value="{{err.tva}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.tva}}</span></sc-if></div>
+</div>
+</sc-if>
+
+<!-- 4 · Obligations -->
+<sc-if value="{{show.s4}}" hint-placeholder-val="{{false}}">
+<div class="up" style="display: flex; flex-direction: column; gap: 6px">
+<div style="border-top: 1px solid #E0E0E0">
+<sc-for list="{{statRows}}" as="r" hint-placeholder-count="5">
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px 0; border-bottom: 1px solid #E0E0E0">
+<div style="min-width: 200px"><b class="d" style="font-size: 15px">{{r.k}}</b><span class="hint" style="display: block">{{r.d}}</span></div>
+<div role="group" aria-label="{{r.aria}}" style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{r.opts}}" as="o" hint-placeholder-count="3"><button type="button" class="{{o.cls}}" aria-pressed="{{o.pressed}}" onClick="{{o.pick}}">{{o.l}}</button></sc-for></div>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{err.statuts}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.statuts}}</span></sc-if>
+<button type="button" class="btn btn-t btn-sm" onClick="{{allUpToDate}}" style="align-self: flex-start; margin-top: 6px">Tout est à jour</button>
+</div>
+</sc-if>
+
+<!-- 5 · Documents -->
+<sc-if value="{{show.s5}}" hint-placeholder-val="{{false}}">
+<div class="up" style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
+<span class="bdg {{fileCountCls}}">{{fileCount}} / 3 fichiers</span>
+<sc-if value="{{showSampleFiles}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-t btn-sm" onClick="{{sampleFiles}}">Utiliser des fichiers d’exemple</button></sc-if>
+</div>
+<sc-for list="{{docSlots}}" as="d" hint-placeholder-count="4">
+<div>
+<sc-if value="{{d.isEmpty}}" hint-placeholder-val="{{true}}">
+<label class="slot {{d.over}}" onDragOver="{{d.dragOver}}" onDragEnter="{{d.dragOver}}" onDragLeave="{{d.dragLeave}}" onDrop="{{d.drop}}">
+<input class="vh" type="file" accept=".csv,.xlsx,.pdf" onChange="{{d.pick}}" aria-label="{{d.aria}}">
+<span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"></path></svg></span>
+<span style="flex: 1; min-width: 0"><span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><b style="font-size: 15px">{{d.l}}</b><sc-if value="{{d.rec}}" hint-placeholder-val="{{false}}"><span class="bdg b-acc" style="padding: 1px 8px">Recommandé</span></sc-if></span><span class="hint" style="display: block">{{d.d}}</span></span>
+<span class="btn btn-g btn-sm" aria-hidden="true">Choisir</span>
+</label>
+</sc-if>
+<sc-if value="{{d.isOff}}" hint-placeholder-val="{{false}}">
+<div class="slot off"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"></path></svg></span><span style="flex: 1"><b style="font-size: 15px">{{d.l}}</b><span class="hint" style="display: block">Maximum de 3 fichiers atteint.</span></span></div>
+</sc-if>
+<sc-if value="{{d.isFilled}}" hint-placeholder-val="{{false}}">
+<div class="slot filled">
+<span class="ic">{{d.ext}}</span>
+<span style="flex: 1; min-width: 0"><span class="micro" style="color: #15803D">{{d.l}} · prêt</span><b style="display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{d.name}}</b><span style="display: flex; align-items: center; gap: 10px; margin-top: 4px"><span class="bar" style="flex: 1; height: 5px"><i style="width: 100%; background: #15803D; animation: grow 1s cubic-bezier(.2,.8,.2,1) both"></i></span><span class="hint m">{{d.size}}</span></span></span>
+<label class="btn btn-g btn-sm" style="position: relative">Remplacer<input class="vh" type="file" accept=".csv,.xlsx,.pdf" onChange="{{d.pick}}" aria-label="{{d.replaceAria}}"></label>
+<button type="button" class="btn btn-t btn-sm btn-ic" onClick="{{d.remove}}" aria-label="{{d.removeAria}}" style="width: 36px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+</div>
+</sc-if>
+</div>
+</sc-for>
+<sc-if value="{{err.files}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.files}}</span></sc-if>
+<p class="hint">CSV ou XLSX exportés de votre logiciel : lecture la plus rapide. PDF natif ou numérisé accepté. 20 Mo maximum par fichier.</p>
+</div>
+</sc-if>
+
+<!-- 6 · Vérification -->
+<sc-if value="{{show.s6}}" hint-placeholder-val="{{false}}">
+<div class="up" style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px">
+<sc-for list="{{recap}}" as="g" hint-placeholder-count="5">
+<section class="rgrp" aria-label="{{g.t}}">
+<div style="display: flex; justify-content: space-between; align-items: center"><h3 style="font-size: 15px">{{g.t}}</h3><button type="button" class="btn btn-t btn-sm" onClick="{{g.edit}}" aria-label="{{g.editL}}" style="min-height: 32px">Modifier</button></div>
+<dl style="margin: 0; display: grid; gap: 6px"><sc-for list="{{g.rows}}" as="r" hint-placeholder-count="3"><div class="rrow"><dt>{{r.l}}</dt><dd>{{r.v}}</dd></div></sc-for></dl>
+</section>
+</sc-for>
+</div>
+<div style="padding: 18px; border-radius: 18px; background: #FAFAF7; border: 1px solid #E0E0E0; display: flex; flex-direction: column; gap: 8px">
+<label style="display: flex; gap: 12px; align-items: flex-start; font-size: 14px; cursor: pointer; min-height: 44px">
+<input type="checkbox" checked="{{f.consent}}" onChange="{{toggleConsent}}" style="width: 20px; height: 20px; accent-color: #000000; margin-top: 2px; flex: none" aria-invalid="{{inv.consent}}">
+<span>J’accepte que DC-KNOWING traite mes documents pour produire ce diagnostic, dans les conditions de la notice d’information (loi n°2013-450, ARTCI).</span>
+</label>
+<button type="button" class="btn btn-t btn-sm" onClick="{{openNotice}}" style="align-self: flex-start; text-decoration: underline; text-decoration-color: #FFD700; text-decoration-thickness: 2px">Lire la notice d’information</button>
+<sc-if value="{{err.consent}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.consent}}</span></sc-if>
+</div>
+</div>
+</sc-if>
+
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 20px; border-top: 1px solid #E0E0E0">
+<sc-if value="{{canBack}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-g" onClick="{{back}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>Précédent</button></sc-if>
+<sc-if value="{{noBack}}" hint-placeholder-val="{{true}}"><span class="hint">Tous les champs sont obligatoires sauf mention.</span></sc-if>
+<sc-if value="{{notLast}}" hint-placeholder-val="{{true}}"><button type="submit" class="btn btn-p btn-lg">Continuer<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
+<sc-if value="{{isLast}}" hint-placeholder-val="{{false}}"><button type="submit" class="btn btn-a btn-lg {{launchCls}}">Lancer mon diagnostic<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
+</div>
+</form>
+
+<aside style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<div class="card glass" style="padding: 22px">
+<p class="micro">Votre dossier</p>
+<dl style="margin: 12px 0 0; display: grid; gap: 10px; font-size: 14px">
+<sc-for list="{{summary}}" as="r" hint-placeholder-count="5"><div class="rrow"><dt>{{r.l}}</dt><dd>{{r.v}}</dd></div></sc-for>
+</dl>
+</div>
+<div class="card dark dk" style="padding: 22px; display: flex; flex-direction: column; gap: 10px">
+<span class="micro" style="color: #FFD700">Après l’envoi</span>
+<p class="m" style="font-size: 26px; font-weight: 700; line-height: 1">≈ 5 min 30</p>
+<p style="color: #D4D4D4; font-size: 13px">Rapport par e-mail en 10 minutes maximum, et toujours disponible dans « Mes diagnostics ».</p>
+</div>
+<p class="hint" style="padding: 0 6px">Besoin d’aide ? 27 22 42 14 43 / 07 67 13 19 93</p>
+</aside>
+</div>
+</div>
+</sc-if>
+
+<!-- ========== ÉCRAN 3 : SUIVI EN DIRECT ========== -->
+<sc-if value="{{show.suivi}}" hint-placeholder-val="{{false}}">
+<div style="max-width: 1100px; margin: 0 auto; padding: 40px 24px 0">
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+<section class="card up" style="padding: 28px; display: flex; flex-direction: column; gap: 22px" aria-live="polite">
+<div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start">
+<div>
+<sc-if value="{{running}}" hint-placeholder-val="{{true}}"><p class="micro" style="display: flex; align-items: center; gap: 8px"><span class="dot"></span>Analyse en cours</p><h1 style="font-size: clamp(1.6rem, 3vw, 2.1rem); margin-top: 8px">Nous préparons votre diagnostic</h1></sc-if>
+<sc-if value="{{failed}}" hint-placeholder-val="{{false}}"><p class="micro" style="color: #DC2626">Traitement interrompu</p><h1 style="font-size: clamp(1.6rem, 3vw, 2.1rem); margin-top: 8px">Lecture automatique impossible</h1></sc-if>
+<sc-if value="{{allDone}}" hint-placeholder-val="{{false}}"><p class="micro" style="color: #15803D">Terminé</p><h1 style="font-size: clamp(1.6rem, 3vw, 2.1rem); margin-top: 8px">Rapport envoyé</h1></sc-if>
+<p class="muted" style="font-size: 14px; margin-top: 6px">{{entreprise}} · envoi à <b style="color: #000000">{{emailShown}}</b></p>
+</div>
+<span class="bdg b-info m">Réf. {{job}}</span>
+</div>
+
+<div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap">
+<div style="position: relative; width: 92px; height: 112px; border: 2px solid #000000; border-radius: 12px; background: #FFFFFF; overflow: hidden; flex: none" aria-hidden="true">
+<div style="position: absolute; top: 0; right: 0; width: 24px; height: 24px; background: #FFD700; border-left: 2px solid #000000; border-bottom: 2px solid #000000; border-bottom-left-radius: 8px"></div>
+<div style="position: absolute; left: 14px; right: 14px; top: 34px; display: grid; gap: 7px"><i style="display: block; height: 5px; background: #EDEDED; border-radius: 3px"></i><i style="display: block; height: 5px; background: #EDEDED; border-radius: 3px; width: 80%"></i><i style="display: block; height: 5px; background: #EDEDED; border-radius: 3px"></i><i style="display: block; height: 5px; background: #EDEDED; border-radius: 3px; width: 60%"></i><i style="display: block; height: 5px; background: #EDEDED; border-radius: 3px; width: 90%"></i></div>
+<sc-if value="{{running}}" hint-placeholder-val="{{true}}"><span class="scan"></span></sc-if>
+</div>
+<div style="flex: 1; min-width: 220px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+<span class="m" style="font-size: 44px; font-weight: 700; line-height: 1">{{pct}}<span style="font-size: 22px">%</span></span>
+<span class="hint m">Temps écoulé {{elapsedL}} · plafond 10:00</span>
+</div>
+<div class="bar" style="height: 14px; margin-top: 12px; border: 1px solid #000000" role="progressbar" aria-label="Avancement du diagnostic" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{pct}}"><i class="{{barCls}}" style="width: {{pct}}%; background: {{barColor}}"></i></div>
+<p class="hint" style="margin-top: 8px">{{remainL}}</p>
+</div>
+</div>
+
+<ol style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px" aria-label="Étapes du traitement">
+<sc-for list="{{stages}}" as="g" hint-placeholder-count="5">
+<li style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; border: 1.5px solid {{g.border}}; background: {{g.bg}}; transition: all .4s">
+<span style="width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: {{g.dotBg}}; color: {{g.dotFg}}; animation: {{g.anim}}">
+<sc-if value="{{g.isDone}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M4 12l5 5L20 6"></path></svg></sc-if>
+<sc-if value="{{g.isCur}}" hint-placeholder-val="{{false}}"><span class="spin" style="width: 16px; height: 16px; border-color: rgba(0,0,0,.2); border-top-color: #000000"></span></sc-if>
+<sc-if value="{{g.isFail}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M6 6l12 12M18 6L6 18"></path></svg></sc-if>
+<sc-if value="{{g.isTodo}}" hint-placeholder-val="{{true}}"><span class="m" style="font-size: 12px; font-weight: 700">{{g.n}}</span></sc-if>
+</span>
+<b class="d" style="font-size: 14px">{{g.l}}</b>
+<span class="hint">{{g.d}}</span>
+</li>
+</sc-for>
+</ol>
+
+<sc-if value="{{failed}}" hint-placeholder-val="{{false}}">
+<div class="up" style="padding: 18px; border-radius: 16px; background: #FEE2E2; border: 1px solid #F6C7C7; display: flex; flex-direction: column; gap: 12px">
+<p style="font-size: 14px"><b>Vos documents n’ont pas pu être lus de façon fiable</b> (confiance de lecture 0,24, seuil 0,30). Aucun rapport automatique n’est produit pour éviter des chiffres erronés. Un e-mail vous a été envoyé et un conseiller vous rappelle au <b class="m">{{telShown}}</b>.</p>
+<div style="display: flex; gap: 10px; flex-wrap: wrap">
+<button type="button" class="btn btn-p" onClick="{{retryFiles}}">Déposer d’autres fichiers</button>
+<button type="button" class="btn btn-g" onClick="{{callMe}}">Être rappelé maintenant</button>
+</div>
+</div>
+</sc-if>
+</section>
+
+<section class="card dark dk up d1" style="padding: 22px; display: flex; flex-direction: column; gap: 12px" aria-labelledby="h-flux">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+<h2 id="h-flux" class="micro" style="color: #FFD700; font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: .14em">Flux d’avancement en direct</h2>
+<sc-if value="{{running}}" hint-placeholder-val="{{true}}"><span class="bdg" style="background: rgba(255,255,255,.12); color: #FFFFFF"><span class="dot"></span>EN DIRECT</span></sc-if>
+</div>
+<div class="m" style="display: flex; flex-direction: column; gap: 8px; min-height: 140px" role="log" aria-live="polite">
+<sc-for list="{{logs}}" as="l" hint-placeholder-count="3">
+<div class="log"><span style="color: #FFD700; flex: none">{{l.time}}</span><span style="color: {{l.color}}">{{l.text}}</span></div>
+</sc-for>
+<sc-if value="{{running}}" hint-placeholder-val="{{true}}"><div class="log" style="color: #D4D4D4"><span class="spin" style="width: 12px; height: 12px; border-width: 2px; border-color: #262626; border-top-color: #FFD700"></span>traitement…</div></sc-if>
+</div>
+</section>
+</div>
+
+<aside style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<div class="card glass up d2" style="padding: 22px; display: flex; flex-direction: column; gap: 10px">
+<p class="micro">Vous pouvez continuer la visite</p>
+<p style="font-size: 14px">Le rapport arrive par e-mail et se range dans « Mes diagnostics », où vous pouvez suivre l’analyse.</p>
+<button type="button" class="btn btn-g btn-sm" onClick="{{openEspace}}" style="align-self: flex-start">Aller à Mes diagnostics</button>
+</div>
+<div class="card up d3" style="padding: 22px; display: flex; flex-direction: column; gap: 12px">
+<p class="micro">Pendant l’attente</p>
+<h3 style="font-size: 17px">Démonstrations La Suite Flow au stand</h3>
+<div style="display: flex; flex-wrap: wrap; gap: 6px"><span class="pill p-sell">Flow Sell</span><span class="pill p-rh">Flow RH</span><span class="pill p-compta">Flow Compta</span><span class="pill p-legal">Flow Legal</span><span class="pill p-task">Flow Task</span></div>
+</div>
+<div class="card up d4" style="padding: 22px; display: flex; flex-direction: column; gap: 8px; background: #FEF9E7; border-color: #FFD700">
+<p class="micro" style="color: #785C03">Le saviez-vous ?</p>
+<p style="font-size: 14px">La facture normalisée électronique (FNE) est encadrée par l’arrêté n°0337 du 9 mai 2025 ; certains secteurs en sont exemptés.</p>
+</div>
+</aside>
+</div>
+</div>
+</sc-if>
+
+<!-- ========== ÉCRAN 4 : RÉSULTAT ========== -->
+<sc-if value="{{show.resultat}}" hint-placeholder-val="{{false}}">
+<sc-if value="{{confetti}}" hint-placeholder-val="{{false}}">
+<div class="conf" aria-hidden="true"><sc-for list="{{confettiPieces}}" as="c" hint-placeholder-count="0"><i style="left: {{c.x}}%; width: {{c.w}}px; height: {{c.h}}px; background: {{c.bg}}; animation-delay: {{c.d}}s"></i></sc-for></div>
+</sc-if>
+<div style="max-width: 1100px; margin: 0 auto; padding: 40px 24px 0; display: flex; flex-direction: column; gap: 24px">
+<section style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap" class="up">
+<span style="width: 64px; height: 64px; border-radius: 50%; background: #15803D; display: grid; place-items: center; animation: popin .6s cubic-bezier(.2,.9,.3,1.2) both; flex: none"><svg class="i check-anim" viewBox="0 0 24 24" aria-hidden="true" style="width: 32px; height: 32px; color: #FFFFFF; stroke-width: 3"><path d="M4 12l5 5L20 6"></path></svg></span>
+<div style="flex: 1; min-width: 240px">
+<p class="micro" style="color: #15803D">Envoyé à {{emailShown}} · Réf. {{job}}</p>
+<h1 style="font-size: clamp(1.8rem, 3.6vw, 2.6rem); margin-top: 6px">Votre rapport est prêt</h1>
+</div>
+<sc-if value="{{hasSlot}}" hint-placeholder-val="{{false}}"><span class="bdg b-ok" style="font-size: 13px; padding: 8px 14px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16"></path></svg>Entretien {{slotL}}</span></sc-if>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px" aria-label="Scores">
+<div class="card up d1" style="padding: 24px; display: flex; gap: 22px; align-items: center">
+<div class="ring gold" style="--sz: 132px; --p: {{count.p}}" role="img" aria-label="{{res.perfAria}}"><b>{{count.p}}</b></div>
+<div><p class="micro">Score de performance</p><p class="d" style="font-size: 30px; font-weight: 800; line-height: 1.1; margin-top: 6px">Grade {{res.gp}}</p><span class="bdg {{res.perfBadgeCls}}" style="margin-top: 8px">{{res.perfBadge}}</span><sc-if value="{{res.indicatif}}" hint-placeholder-val="{{false}}"><span class="bdg b-warn" style="margin: 8px 0 0 6px">Score indicatif</span></sc-if></div>
+</div>
+<div class="card up d2" style="padding: 24px; display: flex; gap: 22px; align-items: center">
+<div class="ring" style="--sz: 132px; --p: {{count.c}}" role="img" aria-label="{{res.confAria}}"><b>{{count.c}}</b></div>
+<div><p class="micro">Score de conformité</p><p class="d" style="font-size: 30px; font-weight: 800; line-height: 1.1; margin-top: 6px">Grade {{res.gc}}</p><span class="bdg {{res.confBadgeCls}}" style="margin-top: 8px">{{res.confBadge}}</span></div>
+</div>
+</section>
+
+<sc-if value="{{res.hasVerdict}}" hint-placeholder-val="{{true}}"><p class="up d2" style="padding: 18px 20px; border-radius: 16px; background: #FEF9E7; border: 1px solid #FFD700; font-size: 16px; font-weight: 600">Verdict : {{res.verdict}}</p></sc-if>
+
+<section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px">
+<div class="card up d3" style="padding: 22px">
+<h2 style="font-size: 18px; display: flex; align-items: center; gap: 8px"><span class="feu" style="background: #15803D"></span>Ce qui va bien</h2>
+<ul style="margin: 12px 0 0; padding-left: 18px; font-size: 14px; display: grid; gap: 6px"><sc-for list="{{res.bien}}" as="t" hint-placeholder-count="3"><li>{{t}}</li></sc-for></ul>
+</div>
+<div class="card up d4" style="padding: 22px">
+<h2 style="font-size: 18px; display: flex; align-items: center; gap: 8px"><span class="feu" style="background: #DC2626"></span>Ce qui doit être traité</h2>
+<ul style="margin: 12px 0 0; padding-left: 18px; font-size: 14px; display: grid; gap: 6px"><sc-for list="{{res.traiter}}" as="t" hint-placeholder-count="3"><li>{{t}}</li></sc-for></ul>
+</div>
+</section>
+
+<section class="card up d4" style="padding: 22px" aria-labelledby="h-plan">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap"><h2 id="h-plan" style="font-size: 18px">Vos premières actions</h2><span class="hint">{{res.planCount}} actions détaillées dans le rapport</span></div>
+<ol style="list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px">
+<sc-for list="{{res.actions}}" as="p" hint-placeholder-count="3"><li style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px; border: 1px solid #E0E0E0; border-radius: 14px"><span class="bdg {{p.cls}}">{{p.prio}}</span><b style="flex: 1; min-width: 200px; font-size: 14px">{{p.action}}</b><span class="hint">{{p.delai}}</span><span class="pill {{p.mod}}">{{p.module}}</span></li></sc-for>
+</ol>
+</section>
+
+<section style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+<button type="button" class="btn btn-a btn-lg {{dlCls}}" onClick="{{openReport}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>Voir le rapport</button>
+<button type="button" class="btn btn-g btn-lg" onClick="{{download}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"></path></svg>Télécharger le PDF</button>
+<button type="button" class="btn btn-p btn-lg" onClick="{{openSlot}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16"></path></svg>{{slotBtn}}</button>
+<button type="button" class="btn btn-g btn-lg" onClick="{{openEspace}}" style="margin-left: auto"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Mes diagnostics</button>
+</section>
+<p class="hint">Ce diagnostic ne constitue ni un audit, ni une certification des comptes, ni un avis juridique. Ce rapport est aussi rangé dans « Mes diagnostics ».</p>
+</div>
+</sc-if>
+
+<!-- ========== MES DIAGNOSTICS (ESPACE VISITEUR) ========== -->
+<sc-if value="{{show.espace}}" hint-placeholder-val="{{false}}">
+<div style="max-width: 1200px; margin: 0 auto; padding: 36px 24px 0; display: flex; flex-direction: column; gap: 24px">
+<div class="up" style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap">
+<div><p class="micro">Mes diagnostics · {{userEmail}}</p><h1 style="font-size: clamp(2rem, 3.6vw, 2.8rem); margin-top: 8px; font-family: Poppins, Sora, sans-serif; font-weight: 800">Bonjour {{firstName}}</h1></div>
+<button type="button" class="btn btn-a btn-lg" onClick="{{start}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nouveau diagnostic</button>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+
+<section class="card up d1" style="padding: 24px; display: flex; flex-direction: column; gap: 16px" aria-labelledby="h-mes">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px"><h2 id="h-mes" style="font-size: 20px">Mes rapports</h2><span class="hint">{{diagCountL}}</span></div>
+<sc-if value="{{hasDiags}}" hint-placeholder-val="{{true}}">
+<sc-for list="{{diagRows}}" as="x" hint-placeholder-count="2">
+<article class="ditem">
+<sc-if value="{{x.done}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; gap: 10px; flex: none">
+<div class="ring gold anim" style="--sz: 64px; --p: {{x.perf}}" role="img" aria-label="{{x.perfAria}}"><b>{{x.perf}}</b></div>
+<div class="ring anim" style="--sz: 64px; --p: {{x.conf}}" role="img" aria-label="{{x.confAria}}"><b>{{x.conf}}</b></div>
+</div>
+</sc-if>
+<sc-if value="{{x.running}}" hint-placeholder-val="{{false}}"><span style="width: 138px; height: 64px; border-radius: 16px; background: #FEF9E7; border: 1px solid #FFD700; display: grid; place-items: center; flex: none"><span class="spin" style="width: 24px; height: 24px; border-width: 3px"></span></span></sc-if>
+<sc-if value="{{x.failed}}" hint-placeholder-val="{{false}}"><span style="width: 138px; height: 64px; border-radius: 16px; background: #FEE2E2; display: grid; place-items: center; flex: none; color: #DC2626"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 26px; height: 26px"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16h.01"></path></svg></span></sc-if>
+<div style="flex: 1; min-width: 200px">
+<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><h3 style="font-size: 17px">{{x.ent}}</h3><span class="bdg {{x.stCls}}">{{x.stL}}</span></div>
+<p class="m" style="font-size: 12px; color: #525252; margin-top: 2px">{{x.ref}} · {{x.date}}</p>
+<sc-if value="{{x.done}}" hint-placeholder-val="{{true}}"><p style="font-size: 13px; margin-top: 4px">Performance <b>{{x.gpL}}</b> · Conformité <b>{{x.gcL}}</b> · {{x.entL}}</p></sc-if>
+<sc-if value="{{x.running}}" hint-placeholder-val="{{false}}"><div class="bar" style="margin-top: 8px; height: 8px"><i class="stripes" style="width: {{x.pct}}%"></i></div><p class="hint" style="margin-top: 4px">{{x.pct}} % · le rapport arrive aussi par e-mail</p></sc-if>
+<sc-if value="{{x.failed}}" hint-placeholder-val="{{false}}"><p style="font-size: 13px; margin-top: 4px; color: #DC2626">Documents illisibles : un conseiller vous rappelle.</p></sc-if>
+</div>
+<div style="display: flex; gap: 8px; flex-wrap: wrap">
+<sc-if value="{{x.done}}" hint-placeholder-val="{{true}}"><button type="button" class="btn btn-p btn-sm {{x.openCls}}" onClick="{{x.open}}">Ouvrir</button><button type="button" class="btn btn-g btn-sm" onClick="{{x.download}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"></path></svg>PDF</button></sc-if>
+<sc-if value="{{x.running}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-g btn-sm" onClick="{{x.follow}}">Suivre en direct</button></sc-if>
+<sc-if value="{{x.failed}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-g btn-sm" onClick="{{start}}">Redéposer</button></sc-if>
+</div>
+</article>
+</sc-for>
+</sc-if>
+<sc-if value="{{diagsLoading}}" hint-placeholder-val="{{false}}"><p class="hint" style="display: flex; gap: 10px; align-items: center"><span class="spin"></span>Chargement de vos diagnostics…</p></sc-if>
+<sc-if value="{{noDiags}}" hint-placeholder-val="{{false}}">
+<div style="padding: 40px 16px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; border: 2px dashed #E0E0E0; border-radius: 20px">
+<span style="width: 64px; height: 64px; border-radius: 18px; background: #FFD700; border: 1px solid #000000; display: grid; place-items: center"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 28px; height: 28px"><path d="M9 17v-6M13 17V7M17 17v-3M4 20h16"></path></svg></span>
+<h3 style="font-size: 19px">Aucun diagnostic pour l’instant</h3>
+<p class="muted" style="font-size: 14px; max-width: 44ch">Déposez vos documents comptables : votre rapport de 3 pages apparaîtra ici et arrivera par e-mail.</p>
+<button type="button" class="btn btn-a" onClick="{{start}}">Faire mon diagnostic</button>
+</div>
+</sc-if>
+</section>
+
+<section class="card up d2" style="padding: 24px; display: flex; flex-direction: column; gap: 16px" aria-label="Programme">
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap">
+<div><h2 style="font-size: 20px">Programme de l’événement</h2><p class="hint">Siège DC-KNOWING, Cocody Riviera 2 · programme indicatif, horaires à confirmer</p></div>
+<div role="group" aria-label="Choisir le jour" style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{progDays}}" as="d" hint-placeholder-count="3"><button type="button" class="{{d.cls}}" aria-pressed="{{d.pressed}}" onClick="{{d.pick}}">{{d.l}}</button></sc-for></div>
+</div>
+<ol style="list-style: none; margin: 4px 0 0; padding: 0">
+<sc-for list="{{progItems}}" as="p" hint-placeholder-count="5"><li class="prog"><span class="t">{{p.t}}</span><span class="l"><i class="{{p.dot}}"></i></span><div class="c"><b style="font-size: 14px">{{p.title}}</b><sc-if value="{{p.hasD}}" hint-placeholder-val="{{true}}"><p class="hint">{{p.d}}</p></sc-if><sc-if value="{{p.mine}}" hint-placeholder-val="{{false}}"><span class="bdg b-acc" style="margin-top: 4px">Votre diagnostic et votre entretien</span></sc-if></div></li></sc-for>
+</ol>
+</section>
+</div>
+
+<aside style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<section class="ticket up d1" aria-labelledby="h-inv">
+<div class="wash" style="padding: 20px 20px 18px; display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center">
+<p class="micro" id="h-inv">Votre invitation</p>
+<img src="assets/img/logo-dc-knowing.png" alt="DC-KNOWING" style="height: 30px; width: auto">
+<span class="lockup"><span class="script" style="font-size: 40px; margin-bottom: -14px; position: relative; z-index: 1">Journées</span><span class="wm" style="font-size: 20px">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 124; height: auto; display: block; margin-top: 2px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></span>
+<div style="display: flex; gap: 10px; align-items: stretch; margin-top: 4px">
+<div class="dcard" style="width: 112px"><span class="dlab" style="font-size: 13px">{{invi.dayName}}</span><span class="dnum {{invi.tone}}" style="height: 70px; font-size: 46px">{{invi.dayNum}}</span><span class="dtime" style="font-size: 15px">{{invi.time}}</span></div>
+<div style="text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 2px"><b style="font-family: Poppins, sans-serif; font-style: italic; font-size: 14px">Siège du Cabinet DC KNOWING</b><span style="font-family: Poppins, sans-serif; font-style: italic; font-size: 13px">Cocody Riviera 2, Collège André Malraux</span><span class="hint" style="margin-top: 4px">{{invi.who}}</span></div>
+</div>
+</div>
+<div class="perf" style="padding: 16px 20px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center">
+<button type="button" class="btn btn-p btn-sm" onClick="{{openInvitation}}">Afficher mon invitation</button>
+<button type="button" class="btn btn-g btn-sm" onClick="{{addCalendar}}">Ajouter à l’agenda</button>
+</div>
+</section>
+
+<section class="card up d2" style="padding: 20px; display: flex; flex-direction: column; gap: 10px" aria-labelledby="h-ent">
+<p class="micro" id="h-ent">Mon entretien</p>
+<sc-if value="{{hasSlot}}" hint-placeholder-val="{{false}}"><p style="font-size: 15px"><b>{{slotL}}</b><br><span class="muted" style="font-size: 13px">20 minutes avec un conseiller, votre rapport en main.</span></p><button type="button" class="btn btn-g btn-sm" onClick="{{openSlot}}" style="align-self: flex-start">Changer de créneau</button></sc-if>
+<sc-if value="{{noSlot}}" hint-placeholder-val="{{true}}"><p style="font-size: 14px" class="muted">Réservez 20 minutes avec un conseiller pour passer votre plan d’action en revue.</p><button type="button" class="btn btn-p btn-sm" onClick="{{openSlot}}" style="align-self: flex-start" disabled="{{noDoneDiag}}">Réserver un créneau</button></sc-if>
+</section>
+
+<section class="card up d3 dk" style="padding: 20px; display: flex; flex-direction: column; gap: 8px; background: #000000; color: #FFFFFF; border-color: #000000">
+<span class="micro" style="color: #FFD700">Pour plus d’infos</span>
+<p style="font-family: Poppins, sans-serif; font-weight: 800; font-size: 18px; line-height: 1.2">27 22 42 14 43<br>07 67 13 19 93</p>
+<a href="https://portaildck.dc-knowing.com" style="color: #FFD700; font-weight: 700; font-size: 14px">portaildck.dc-knowing.com</a>
+<a href="mailto:infos@dc-knowing.com" style="color: #FFFFFF; font-size: 13px">infos@dc-knowing.com</a>
+</section>
+
+<section style="padding: 0 6px; display: flex; flex-direction: column; gap: 6px">
+<p class="micro muted">Mes données</p>
+<p class="hint">Fichiers bruts supprimés après 24 h. Rapports conservés 30 jours.</p>
+<button type="button" class="btn btn-t btn-sm" onClick="{{askDelete}}" style="align-self: flex-start; margin-left: -12px; color: #DC2626">Supprimer mes données</button>
+</section>
+</aside>
+</div>
+</div>
+</sc-if>
+</main>
+
+<footer class="dk" style="margin-top: 72px; background: #000000; color: #FFFFFF; padding: 36px 0 28px; font-size: 14px">
+<div style="max-width: 1200px; margin: 0 auto; padding: 0 24px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-wrap: wrap; gap: 24px; justify-content: space-between; align-items: flex-end">
+<div style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start">
+<span class="gold-tag">Pour plus d’infos</span>
+<p style="font-family: Poppins, sans-serif; font-weight: 800; font-size: clamp(1.4rem, 2.6vw, 2rem); line-height: 1.1"><a href="tel:+2252722421443" style="color: #FFFFFF; text-decoration: none">27 22 42 14 43</a> / <a href="tel:+2250767131993" style="color: #FFFFFF; text-decoration: none">07 67 13 19 93</a></p>
+<p style="display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px"><a href="https://portaildck.dc-knowing.com" style="color: #FFD700; font-weight: 700; text-decoration: none">portaildck.dc-knowing.com</a><span style="color: #D4D4D4">|</span><span style="font-style: italic">Cocody Riviera 2, Abidjan</span><span style="color: #D4D4D4">|</span><a href="mailto:infos@dc-knowing.com" style="color: #FFFFFF; font-style: italic">infos@dc-knowing.com</a></p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-end">
+<p style="font-family: Poppins, sans-serif; font-size: 15px; letter-spacing: .04em">PROPULSÉ PAR <b style="font-weight: 800">LA SUITE FLOW</b></p>
+<div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end"><span class="pill p-sell">Sell</span><span class="pill p-rh">RH</span><span class="pill p-compta">Compta</span><span class="pill p-legal">Legal</span><span class="pill p-task">Task</span></div>
+</div>
+</div>
+<p style="color: #D4D4D4; font-size: 12px; border-top: 1px solid #262626; padding-top: 14px">Check-up 360 · IA pour l’extraction seule, calculs déterministes, SYSCOHADA révisé · Ne constitue ni un audit, ni une certification des comptes, ni un avis juridique. · <a href="conseiller.html" style="color: #D4D4D4">Accès équipe DC-KNOWING</a></p>
+</div>
+</footer>
+
+<!-- ========== MODALES ========== -->
+<sc-if value="{{m.notice}}" hint-placeholder-val="{{false}}">
+<div class="ov" onClick="{{ovClick}}" onKeyDown="{{ovKey}}">
+<div class="mdl" role="dialog" aria-modal="true" aria-labelledby="t-notice" style="width: min(620px, 100%)">
+<div class="mh"><h3 id="t-notice" style="font-size: 18px">Notice d’information — vos données</h3><button type="button" class="btn btn-g btn-ic btn-sm" onClick="{{closeModal}}" aria-label="Fermer" style="width: 36px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
+<div class="mb" style="display: flex; flex-direction: column; gap: 12px">
+<p class="muted">Traitement réalisé par le cabinet DC-KNOWING dans le cadre de la loi n°2013-450 relative à la protection des données à caractère personnel (ARTCI).</p>
+<ul style="margin: 0; padding-left: 18px; display: grid; gap: 8px">
+<li><b>Finalité :</b> produire votre diagnostic financier et de conformité, puis préparer votre entretien.</li>
+<li><b>Anonymisation :</b> noms, NCC, RIB et téléphones sont remplacés avant tout appel à l’IA ; le prestataire IA est configuré sans collecte de données.</li>
+<li><b>Sécurité :</b> chiffrement au repos et en transit ; lecture des fichiers dans un environnement sans réseau ; journal d’audit de chaque accès.</li>
+<li><b>Conservation :</b> fichiers bruts supprimés après 24 h ; rapport conservé 30 jours puis archivé chiffré.</li>
+<li><b>Limites :</b> ce diagnostic n’est ni un audit, ni une certification des comptes, ni un avis juridique.</li>
+</ul>
+<p class="hint">Pour exercer vos droits : infos@dc-knowing.com · 27 22 42 14 43.</p>
+</div>
+<div class="mf"><button type="button" class="btn btn-g" onClick="{{closeModal}}">Fermer</button><button type="button" class="btn btn-a" onClick="{{acceptNotice}}">J’accepte</button></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{m.quit}}" hint-placeholder-val="{{false}}">
+<div class="ov" onClick="{{ovClick}}" onKeyDown="{{ovKey}}">
+<div class="mdl" role="dialog" aria-modal="true" aria-labelledby="t-quit" style="width: min(440px, 100%)">
+<div class="mh"><h3 id="t-quit" style="font-size: 18px">{{quitTitle}}</h3></div>
+<div class="mb muted">{{quitText}}</div>
+<div class="mf"><button type="button" class="btn btn-g" onClick="{{closeModal}}">Continuer</button><button type="button" class="btn btn-p" onClick="{{confirmQuit}}">{{quitBtn}}</button></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{m.slot}}" hint-placeholder-val="{{false}}">
+<div class="ov" onClick="{{ovClick}}" onKeyDown="{{ovKey}}">
+<div class="mdl" role="dialog" aria-modal="true" aria-labelledby="t-slot" style="width: min(560px, 100%)">
+<div class="mh"><h3 id="t-slot" style="font-size: 18px">Réserver votre entretien individuel</h3><button type="button" class="btn btn-g btn-ic btn-sm" onClick="{{closeModal}}" aria-label="Fermer" style="width: 36px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
+<div class="mb" style="display: flex; flex-direction: column; gap: 14px">
+<p class="muted">{{jourL}} · siège DC-KNOWING, Cocody Riviera 2 · 20 minutes avec un conseiller, votre rapport en main.</p>
+<div role="group" aria-label="Créneaux disponibles" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px">
+<sc-for list="{{slots}}" as="s" hint-placeholder-count="12"><button type="button" class="{{s.cls}} m" aria-pressed="{{s.pressed}}" onClick="{{s.pick}}" disabled="{{s.dis}}" aria-label="{{s.aria}}">{{s.t}}</button></sc-for>
+</div>
+<p class="hint">Créneaux barrés : déjà réservés.</p>
+</div>
+<div class="mf"><button type="button" class="btn btn-g" onClick="{{closeModal}}">Annuler</button><button type="button" class="btn btn-a" onClick="{{confirmSlot}}" disabled="{{noPick}}">Confirmer le créneau</button></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{m.programme}}" hint-placeholder-val="{{false}}">
+<div class="ov" onClick="{{ovClick}}" onKeyDown="{{ovKey}}">
+<div class="mdl" role="dialog" aria-modal="true" aria-label="Programme" style="width: min(680px, 100%)">
+<div class="mh"><span class="micro">Journées Portes Ouvertes · 16–18 déc. 2026</span><button type="button" class="btn btn-g btn-ic btn-sm" onClick="{{closeModal}}" aria-label="Fermer" style="width: 36px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
+<div class="mb" style="display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap">
+<div><h2 style="font-size: 20px">Programme de l’événement</h2><p class="hint">Siège DC-KNOWING, Cocody Riviera 2 · programme indicatif, horaires à confirmer</p></div>
+<div role="group" aria-label="Choisir le jour" style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{progDays}}" as="d" hint-placeholder-count="3"><button type="button" class="{{d.cls}}" aria-pressed="{{d.pressed}}" onClick="{{d.pick}}">{{d.l}}</button></sc-for></div>
+</div>
+<ol style="list-style: none; margin: 4px 0 0; padding: 0">
+<sc-for list="{{progItems}}" as="p" hint-placeholder-count="5"><li class="prog"><span class="t">{{p.t}}</span><span class="l"><i class="{{p.dot}}"></i></span><div class="c"><b style="font-size: 14px">{{p.title}}</b><sc-if value="{{p.hasD}}" hint-placeholder-val="{{true}}"><p class="hint">{{p.d}}</p></sc-if><sc-if value="{{p.mine}}" hint-placeholder-val="{{false}}"><span class="bdg b-acc" style="margin-top: 4px">Votre diagnostic et votre entretien</span></sc-if></div></li></sc-for>
+</ol>
+</div>
+<div class="mf"><button type="button" class="btn btn-g" onClick="{{closeModal}}">Fermer</button><button type="button" class="btn btn-a" onClick="{{startFromModal}}">Faire mon diagnostic</button></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{m.invitation}}" hint-placeholder-val="{{false}}">
+<div class="ov" onClick="{{ovClick}}" onKeyDown="{{ovKey}}">
+<div class="mdl" role="dialog" aria-modal="true" aria-labelledby="t-inv" style="width: min(440px, 100%); overflow: visible">
+<div class="ticket" style="border: 0; border-radius: 28px">
+<div class="wash" style="padding: 28px 24px 20px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; border-radius: 28px 28px 0 0">
+<p style="font-family: Poppins, sans-serif; font-style: italic; font-size: 14px">Le cabinet</p>
+<img src="assets/img/logo-dc-knowing.png" alt="DC-KNOWING — The bespoke partner" style="height: 44px; width: auto; margin-top: -8px">
+<p style="font-family: Poppins, sans-serif; font-style: italic; font-size: 14px; letter-spacing: .4em">vous invite à</p>
+<h2 id="t-inv" style="margin: 0"><span class="lockup"><span class="script" style="font-size: 56px; margin-bottom: -20px; position: relative; z-index: 1">Journées</span><span class="wm" style="font-size: 28px">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 170; height: auto; display: block; margin-top: 2px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></span></h2>
+<div class="dcard" style="width: 150px"><span class="dlab" style="font-size: 15px">{{invi.dayName}}</span><span class="dnum {{invi.tone}}" style="height: 92px; font-size: 62px">{{invi.dayNum}}</span><span class="dtime" style="font-size: 19px">{{invi.time}}</span></div>
+<p style="font-family: Poppins, sans-serif; font-weight: 800; font-style: italic">Siège du Cabinet DC KNOWING<br><span style="font-weight: 400">Cocody Riviera 2, Collège André Malraux</span></p>
+</div>
+<div class="perf" style="padding: 20px 24px 24px; display: flex; gap: 16px; align-items: center">
+<div class="qr" style="--q: 112px" role="img" aria-label="Code QR d’accès (aperçu)"><sc-for list="{{qr}}" as="c" hint-placeholder-count="0"><i style="background: {{c}}"></i></sc-for></div>
+<div style="font-size: 13px; display: flex; flex-direction: column; gap: 2px; min-width: 0"><span class="micro muted">Invité</span><b style="overflow-wrap: anywhere">{{invi.who}}</b><span class="m" style="font-size: 12px">{{invi.code}}</span><span class="hint">Présentez ce code à l’accueil.</span></div>
+</div>
+</div>
+<div class="mf" style="border-top: 1px solid #E0E0E0"><button type="button" class="btn btn-g" onClick="{{closeModal}}">Fermer</button><button type="button" class="btn btn-p" onClick="{{sendInvitation}}">Recevoir par e-mail</button></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{m.logout}}" hint-placeholder-val="{{false}}">
+<div class="ov" onClick="{{ovClick}}" onKeyDown="{{ovKey}}">
+<div class="mdl" role="dialog" aria-modal="true" aria-labelledby="t-out" style="width: min(420px, 100%)">
+<div class="mh"><h3 id="t-out" style="font-size: 18px">Se déconnecter ?</h3></div>
+<div class="mb muted">Vos diagnostics restent enregistrés. Pour revenir, il suffira de saisir votre e-mail et le code reçu.</div>
+<div class="mf"><button type="button" class="btn btn-g" onClick="{{closeModal}}">Rester connecté</button><button type="button" class="btn btn-p" onClick="{{logout}}">Se déconnecter</button></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{m.del}}" hint-placeholder-val="{{false}}">
+<div class="ov" onClick="{{ovClick}}" onKeyDown="{{ovKey}}">
+<div class="mdl" role="dialog" aria-modal="true" aria-labelledby="t-del" style="width: min(440px, 100%)">
+<div class="mh"><h3 id="t-del" style="font-size: 18px">Supprimer mes données ?</h3></div>
+<div class="mb muted">Vos rapports, votre invitation et votre compte « Mes diagnostics » seront supprimés. Cette action est définitive.</div>
+<div class="mf"><button type="button" class="btn btn-g" onClick="{{closeModal}}">Annuler</button><button type="button" class="btn btn-p" onClick="{{confirmDelete}}" style="background: #DC2626">Supprimer</button></div>
+</div>
+</div>
+</sc-if>
+
+<div class="toasts" aria-live="polite">
+<sc-for list="{{toasts}}" as="t" hint-placeholder-count="0">
+<div class="toast {{t.cls}}" role="status">
+<sc-if value="{{t.ok}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l5 5L20 6"></path></svg></sc-if>
+<sc-if value="{{t.bad}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></sc-if>
+<sc-if value="{{t.info}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8h.01M11 12h1v5h1"></path></svg></sc-if>
+<div style="flex: 1; min-width: 0"><b style="display: block">{{t.title}}</b><span style="font-size: 13px; color: #262626">{{t.text}}</span></div>
+<button type="button" class="btn btn-t btn-sm" onClick="{{t.close}}" aria-label="Fermer la notification" style="padding: 0; width: 32px; min-height: 32px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+</div>
+</sc-for>
+</div>
+</div>
+
+
+</script>
+
+<script src="config.js"></script>
+<script src="assets/js/vendor/preact.min.js"></script>
+<script src="assets/js/dc-runtime.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/app-visiteur.js"></script>
+<script>DC.mount(Component, 'tpl-visiteur', document.getElementById('app'), DC.queryProps());</script>
+</body>
+</html>

@@ -1,0 +1,618 @@
+================================================================================
+ SPÉCIFICATION TECHNIQUE — VERSION FINALE (v2.1)
+ Diagnostic financier & conformité automatisé
+ Journées Portes Ouvertes DC-KNOWING · 16, 17 et 18 décembre 2026
+ Module interne : « Check-up 360 »
+================================================================================
+ Statut      : prête pour développement
+ Date        : 25 novembre 2026
+ Remplace    : « Architecture Backend Complète — Check-up 360 » (v1)
+ Remplace aussi : v2.0 (rapport PDF WeasyPrint de 3 pages) → rapport Word de 4 pages
+ Livrables liés (même dossier) :
+   - moteur_rapport.py ............ moteur de calcul : KPI, scores, barèmes
+   - word/generer_rapport.py ...... rédaction du rapport en Markdown (langage
+                                    simple) + appel du rendu Word + contrôle
+                                    « 4 pages exactement »
+   - word/md_vers_word.js ......... rendu Markdown → Word (.docx), mise en page
+                                    figée (charte, graphiques, encadrés)
+   - word/GUIDE_MARKDOWN.txt ...... syntaxe du Markdown, règles de rédaction
+   - word/logo.png ................ logo DC-KNOWING haute définition
+   - word/package.json ............ dépendances Node (docx, @resvg/resvg-js)
+   - exemple_entree.json .......... exemple de sortie IA + formulaire
+   - exemples/ .................... rapports de référence (« golden files ») :
+                                    Client_A (cas type), Client_B (entreprise
+                                    saine), Client_C (données manquantes, perte)
+
+
+--------------------------------------------------------------------------------
+ 0. CE QUI CHANGE PAR RAPPORT À LA v1
+--------------------------------------------------------------------------------
+ Corrections de fond
+ [C1] Seuils des régimes fiscaux corrigés (la v1 donnait RME ≤ 100 M et réel
+      simplifié dès 100 M, ce qui est faux). Barème retenu, CA HT :
+        TEE (entreprenant) 5 M – 50 M · RME 50 M – 200 M (option réel simplifié
+        possible dès 100 M) · Réel simplifié 200 M – 500 M · Réel normal > 500 M.
+      Source : PwC, « Navigating taxation 2026 — Côte d'Ivoire ».
+ [C2] Pénalité CNPS : la v1 annonçait « 2 % par mois », valeur non sourcée.
+      Valeur relevée : 0,05 % par jour de retard (texte CNPS repris par Loidici),
+      à confirmer auprès de la CNPS. Le rapport client ne cite aucun taux.
+ [C3] FNE : base légale ajoutée (arrêté n°0337 du 9 mai 2025), calendrier de
+      généralisation et secteurs exemptés intégrés au barème.
+ [C4] Achats : le coût des achats = marchandises (601) + matières (602). La v1
+      ignorait les matières dans la marge et le délai fournisseurs.
+ [C5] Bug v1 : « marge_nette » utilisée hors de son bloc quand le résultat est
+      NON_DISPONIBLE. Corrigé.
+ [C6] Données manquantes : la v1 donnait 0 point sans le dire. Ajout d'un taux
+      de couverture et d'une mention « score indicatif » sous 60 points évaluables.
+ [C7] Le prompt système contenait les balises brutes du modèle Llama
+      (<|begin_of_text|>…). Avec l'API chat d'OpenRouter, ces balises ne doivent
+      pas être envoyées : le prompt passe en message « system ».
+ [C8] Rapport : 4 pages au format Word (.docx), produit à partir d'un fichier
+      Markdown ; moins de chiffres, davantage d'explications (section 11).
+ [C9] Mention « ARTCI art. 35 » retirée : numéro d'article non vérifié.
+
+ Arbitrages techniques
+ [A1] File d'attente : Celery + Redis (la v1 hésitait avec BullMQ).
+ [A2] Rendu : Markdown balisé → Word avec docx-js (Node 20). Les graphiques
+      sont dessinés en SVG puis convertis en PNG (resvg) et insérés dans le
+      .docx. WeasyPrint et Matplotlib ne sont plus nécessaires.
+ [A3] Le texte du rapport est rédigé par le moteur (phrases déterministes en
+      langage simple). Un second appel IA, facultatif, peut reformuler ce
+      Markdown sans toucher aux nombres ni à la structure (section 10).
+ [A4] Toute correction (par un conseiller ou par une IA) se fait dans le
+      fichier .md, puis « node md_vers_word.js rapport.md rapport.docx » :
+      la mise en page est identique à chaque exécution.
+
+
+--------------------------------------------------------------------------------
+ 1. OBJET ET PÉRIMÈTRE
+--------------------------------------------------------------------------------
+ But : pendant les Journées Portes Ouvertes, chaque entreprise dépose ses
+ documents comptables et reçoit par e-mail, en 10 minutes maximum, un rapport
+ Word de 4 pages (+ PDF) : santé financière, trésorerie, conformité, plan
+ d'action.
+
+ Volumétrie : 15 entreprises par jour (45 sur 3 jours), pic de 15 dépôts
+ simultanés. Fichiers acceptés : CSV, XLSX, PDF (natif ou numérisé), 20 Mo max.
+
+ Hors périmètre : audit, certification des comptes, conseil juridique
+ personnalisé (mentionné dans le rapport).
+
+
+--------------------------------------------------------------------------------
+ 2. PARCOURS ET FORMULAIRE
+--------------------------------------------------------------------------------
+ 2.1 Parcours
+   1. Le visiteur remplit le formulaire et dépose 1 à 3 fichiers.
+   2. Écran d'attente avec statut en direct (SSE) : Lecture > Analyse > Calcul >
+      Rapport > Envoyé.
+   3. E-mail avec le rapport Word et PDF joints + lien de téléchargement signé (validité 7 jours).
+   4. Le conseiller voit le rapport dans son tableau de bord pour l'entretien
+      individuel.
+
+ 2.2 Champs du formulaire (tous obligatoires sauf mention)
+   - Raison sociale, NCC (facultatif), secteur (liste), effectif
+   - Contact : nom, e-mail, téléphone
+   - Type de client : ACTUEL | REACTIVER | PROSPECT
+   - Jour de l'événement : 2026-12-16 | 2026-12-17 | 2026-12-18
+   - Régime fiscal déclaré : TEE | RME | REEL_SIMPLIFIE | REEL_NORMAL | NE_SAIT_PAS
+   - FNE : ACTIVE | EN_COURS_ACTIVATION | NON_ACTIVE | NE_SAIT_PAS
+   - Statuts déclaratifs (À jour / En retard / Ne sait pas) : DGI, CNPS, ITS,
+     CMU, DISA
+   - Activité exonérée de TVA : oui / non (impacte les délais de paiement)
+   - Fichiers : balance générale, compte de résultat, bilan, grand livre ou
+     journal, déclarations
+   - Consentement explicite au traitement des données (case non pré-cochée),
+     avec lien vers la notice ARTCI.
+
+ Règle : les réponses « Ne sait pas » sont transmises comme NON_DISPONIBLE.
+
+
+--------------------------------------------------------------------------------
+ 3. ARCHITECTURE
+--------------------------------------------------------------------------------
+ 3.1 Pipeline (cible : 5 min 30 s, plafond : 10 min)
+
+   Formulaire (React) → API (FastAPI) → File (Redis/Celery) → Worker → E-mail
+
+   Étapes du worker :
+     A. Lecture       CSV/XLSX : pandas + openpyxl + chardet ; PDF : pdfplumber
+                      si texte natif, sinon OCR (AWS Textract, repli Tesseract 5)
+     B. Anonymisation noms, NCC, RIB, téléphones → Client_A, Compte_X…
+     C. Appel IA n°1  mapping sémantique → JSON (section 4)
+     D. Validation    Pydantic + contrôles de cohérence (section 5)
+     E. Calcul        KPI, scores, alertes, plan d'action (sections 6 à 9)
+     F. Rédaction     generer_rapport.py → rapport.md (section 11)
+     F'. Appel IA n°2 reformulation facultative du .md (section 10)
+     G. Rendu Word    md_vers_word.js → .docx, 4 pages exactement ; PDF de
+                      contrôle via LibreOffice (section 11)
+     H. Envoi         SendGrid (ou Mailgun) + stockage chiffré + statut
+
+ 3.2 Conteneurs (Docker Compose)
+   api (FastAPI :8000) · worker ×2 (Celery) · redis :6379 · postgres :5432 ·
+   minio :9000 · sandbox (lecture des fichiers, --network=none)
+
+ 3.3 Pile technique retenue
+   Python 3.12, FastAPI, Celery 5 + Redis 7, PostgreSQL 16, MinIO (ou S3),
+   pandas, openpyxl, chardet, pdfplumber, Textract/Tesseract 5, OpenRouter,
+   Pydantic v2, Node 20 + docx 9 + @resvg/resvg-js 2.6, LibreOffice 7
+   (contrôle du nombre de pages et PDF), SendGrid, Sentry, Prometheus/Grafana,
+   GitHub Actions. Hébergement : VPS Ubuntu 22.04, ou serveur au siège si
+   l'hébergement local est exigé.
+
+
+--------------------------------------------------------------------------------
+ 4. APPEL IA N°1 — EXTRACTION (CONTRAT JSON)
+--------------------------------------------------------------------------------
+ 4.1 Règles absolues (inchangées)
+   - L'IA identifie, classe et extrait. Elle ne calcule jamais.
+   - Sortie : un seul objet JSON valide, sans texte autour.
+   - Valeur absente ou incertaine : chaîne exacte "NON_DISPONIBLE".
+   - Chaque champ porte une confiance 0–1 et ses colonnes sources.
+   - Montants en XOF ; EUR converti au taux fixe 1 EUR = 655,957 FCFA, signalé
+     dans warnings.
+
+ 4.2 Schéma de sortie
+   Identique à la v1 (sections meta, compte_resultat, bilan, tresorerie,
+   conformite, mapping_audit) avec trois ajouts :
+     conformite.fne.statut             + valeur "NON_APPLICABLE" (secteur exempté)
+     conformite.regime_fiscal          sans le champ "regime_recommande"
+                                       (calculé par le moteur, pas par l'IA)
+     meta.secteur_exempte_fne          true | false | "NON_DISPONIBLE"
+   Les champs calculés (marge_brute, ebe, resultat_exploitation, resultat_net,
+   tresorerie.*) restent à "NON_DISPONIBLE" côté IA.
+
+ 4.3 Appel OpenRouter
+   POST https://openrouter.ai/api/v1/chat/completions
+   {
+     "model": "meta-llama/llama-3.1-70b-instruct",
+     "messages": [
+       {"role": "system", "content": "<prompt système 4.4>"},
+       {"role": "user",   "content": "<bloc contexte 4.5>"}
+     ],
+     "temperature": 0,
+     "response_format": {"type": "json_object"},
+     "provider": {"data_collection": "deny", "require_parameters": true},
+     "max_tokens": 4000
+   }
+   Délai d'attente 120 s ; 3 tentatives (backoff 2 s, 6 s, 18 s) ; si le JSON
+   est invalide après validation, une seule relance avec le message d'erreur
+   Pydantic ajouté au contexte. Modèle de repli : llama-3.1-8b-instruct pour
+   les fichiers simples (CSV propres), 70b pour les balances complexes et l'OCR.
+
+ 4.4 Prompt système
+   Reprendre le texte de la v1 (« IDENTITÉ ET RÔLE » → « Réponds UNIQUEMENT par
+   le JSON »), avec ces modifications :
+   - supprimer les balises <|begin_of_text|>, <|start_header_id|>…, <|eot_id|> ;
+   - dans le schéma, retirer "regime_recommande" et ajouter les champs 4.2 ;
+   - ajouter la règle : « Si le secteur fait partie des secteurs exemptés de FNE
+     (concessionnaires d'eau, d'électricité et de téléphone, compagnies
+     aériennes, pharmacies, banques, assurances, stations-service pour la vente
+     de carburant), indique fne.statut = "NON_APPLICABLE". »
+   - ajouter : « Les achats de matières (602) sont distincts des marchandises
+     (601) : ne les additionne pas. »
+
+ 4.5 Bloc contexte utilisateur
+   TYPE_DOCUMENT: <auto ou indiqué>
+   PERIODE: <JJ/MM/AAAA – JJ/MM/AAAA>
+   DONNEES_FORMULAIRE:
+     - Régime fiscal déclaré: <…>
+     - FNE: <…>
+     - Statuts DGI / CNPS / ITS / CMU / DISA: <…>
+     - Effectif: <n> ; Secteur: <…> ; TVA exonérée: <oui/non>
+   TEXTE_BRUT_DU_DOCUMENT:
+   <texte anonymisé, tronqué à 60 000 caractères, totaux par classe en priorité>
+
+
+--------------------------------------------------------------------------------
+ 5. VALIDATION ET CONTRÔLES DE COHÉRENCE
+--------------------------------------------------------------------------------
+ 5.1 Validation Pydantic : types, énumérations, dates ISO, confiance 0–1.
+ 5.2 Contrôles déterministes (résultats ajoutés aux warnings internes) :
+   - Montants négatifs inattendus (CA, achats, charges) → valeur rejetée → ND
+   - Équilibre du bilan : |Actif − Passif| / Actif ≤ 5 % ; sinon avertissement
+     interne « bilan incomplet » (le calcul continue)
+   - Confiance d'un champ < 0,60 → champ traité comme NON_DISPONIBLE
+   - Confiance globale < 0,50 → rapport marqué « lecture partielle »
+ 5.3 Couverture des données
+   couverture = champs disponibles / champs attendus (compte de résultat + bilan),
+   affichée en page 1 (« Données exploitées : xx % »).
+
+
+--------------------------------------------------------------------------------
+ 6. MOTEUR DE CALCUL — INDICATEURS (KPI)
+--------------------------------------------------------------------------------
+ Notation : ND = non disponible ; toute formule dont un terme est ND rend ND.
+   achats            = achats marchandises (601) + achats matières (602)
+                       (si les deux sont ND → ND ; si un seul est ND → l'autre)
+   evolution_ca %    = (CA − CA N-1) / CA N-1 × 100
+   marge_brute       = CA − achats            ; taux = / CA × 100
+   EBE               = CA − achats − personnel − autres charges ; taux = / CA
+   resultat_av_impot = EBE − dotations − charges financières + produits financiers
+   resultat_net      = resultat_av_impot − impôt ; taux = / CA × 100
+   tresorerie_nette  = trésorerie actif − trésorerie passif
+   coef_tva          = 1,18 (taux normal) ; 1,00 si activité exonérée
+   delai_clients j   = créances clients / (CA × coef_tva) × 365
+   delai_fourn. j    = dettes fournisseurs / (achats × coef_tva) × 365
+   BFR (simplifié)   = créances clients + stocks − dettes fournisseurs
+   BFR en jours      = BFR / CA × 365
+   masse_salariale % = personnel / CA × 100
+   endettement %     = dettes financières / capitaux propres × 100
+   IMF               = min(max(0,5 % × CA × 1,18 ; 3 000 000) ; 35 000 000)
+   IS théorique      = 25 % × max(resultat_av_impot ; 0)
+
+ Les 8 KPI de la page 1 et leurs repères (feu vert / orange / rouge) :
+   CA HT            évolution ≥ +5 % vert · ≥ 0 % orange · sinon rouge
+   Marge brute      ≥ 40 % vert · ≥ 25 % orange · sinon rouge
+   EBE / CA         ≥ 10 % vert · ≥ 5 % orange · sinon rouge
+   Résultat net/CA  ≥ 5 % vert · ≥ 0 % orange · sinon rouge
+   Trésorerie nette > 0 vert · sinon rouge
+   Délai clients    ≤ 60 j vert · ≤ 90 j orange · sinon rouge
+   Délai fourniss.  ≥ 45 j vert · ≥ 30 j orange · sinon rouge
+   Endettement      ≤ 50 % vert · ≤ 80 % orange · sinon rouge
+ Ces repères sont généraux ; une table « repères par secteur » est prévue en
+ v2.1 (paramètre secteur → seuils).
+
+
+--------------------------------------------------------------------------------
+ 7. SCORE DE PERFORMANCE (/100)
+--------------------------------------------------------------------------------
+ Barème v1 conservé, avec les corrections C4, C5, C6.
+
+ Bloc 1 — CA & croissance (20)
+   évolution ≥ 15 % → 20 ; ≥ 10 → 16 ; ≥ 5 → 12 ; ≥ 0 → 8 ; ≥ −5 → 4 ; sinon 0
+   sans CA N-1 : évolution comptée à 0 (8 pts, non pénalisant)
+   bonus +2 si CA ≥ 100 M (plafond 20)
+ Bloc 2 — Marge brute (10) + EBE (10)
+   marge ≥ 40 → 10 ; ≥ 25 → 7 ; ≥ 15 → 4 ; sinon 1
+   EBE ≥ 20 → 10 ; ≥ 10 → 7 ; ≥ 5 → 4 ; ≥ 0 → 2 ; sinon 0
+ Bloc 3 — Résultat net (15)
+   ≥ 10 % → 15 ; ≥ 5 → 11 ; ≥ 2 → 7 ; ≥ 0 → 3 ; sinon 0
+ Bloc 4 — Trésorerie (10) + délais (10)
+   trésorerie nette > 0 → 10 ; sinon 2
+   clients ≤ 30 j → 5 ; ≤ 60 → 3 ; ≤ 90 → 1 ; sinon 0
+   fournisseurs ≥ 45 j → 5 ; ≥ 30 → 3 ; sinon 1
+ Bloc 5 — Masse salariale / CA (10)
+   ≤ 20 % → 10 ; ≤ 35 → 7 ; ≤ 50 → 4 ; sinon 1
+ Bloc 6 — Endettement / capitaux propres (15)
+   ≤ 30 % → 15 ; ≤ 50 → 11 ; ≤ 80 → 6 ; ≤ 100 → 3 ; sinon 0
+   capitaux propres ≤ 0 → 0 pt + alerte « capitaux propres négatifs »
+
+ Données manquantes : un bloc ND vaut 0 et est marqué « non évalué ».
+ points_evaluables = somme des maxima des blocs évalués.
+ Si points_evaluables < 60 → mention « score indicatif » sur le rapport.
+ Grade : A ≥ 80 · B ≥ 60 · C ≥ 40 · D < 40.
+ Alertes : < 40 « risque critique » ; < 60 « performance fragile ».
+
+
+--------------------------------------------------------------------------------
+ 8. SCORE DE CONFORMITÉ (/100)
+--------------------------------------------------------------------------------
+ Bloc 1 — Déclarations DGI (25)
+   À jour 25 · En retard 8 (−5 si pénalités connues > 0) · ND 0 + alerte
+ Bloc 2 — FNE (25)
+   ACTIVE 25 · NON_APPLICABLE 25 (secteur exempté) · EN_COURS 12 ·
+   NON_ACTIVE 3 + alerte critique · ND 0 + alerte
+   (Le contrôle « logiciel homologué » de la v1 est retiré : aucune liste
+   officielle n'a été vérifiée. À réintroduire si la DGI publie une liste.)
+   Repères : arrêté n°0337 du 9 mai 2025 ; généralisation par régime entre
+   juin et septembre 2025 ; factures papier normalisées valables jusqu'au
+   2 septembre 2025.
+ Bloc 3 — Régime fiscal (25)
+   régime attendu selon le CA HT :
+     ≤ 50 M → TEE ; ≤ 200 M → RME ; ≤ 500 M → REEL_SIMPLIFIE ; > 500 M → REEL_NORMAL
+   cohérent (25 pts) si régime déclaré = attendu, ou si attendu = RME,
+     CA ≥ 100 M et régime déclaré = REEL_SIMPLIFIE (option)
+   régime plus lourd que nécessaire → 18 pts + alerte « surcharge administrative »
+   régime plus léger que le CA ne le permet → 5 pts + alerte critique
+   ND → 0 + alerte
+   Note : sous 5 M de CA, situation à confirmer (hors barème TEE relevé).
+ Bloc 4 — CNPS (15) + ITS / CMU / DISA (10)
+   CNPS : À jour 15 · En retard 5 + alerte · ND 0
+   Sociaux : arrondi(nb « à jour » / nb renseignés × 10) ; aucun renseigné → 0
+   Alerte par obligation en retard.
+ Total plafonné à 100. Score < 50 → alerte « risque de redressement ».
+
+
+--------------------------------------------------------------------------------
+ 9. PLAN D'ACTION, ORIENTATION ET INFORMATIONS
+--------------------------------------------------------------------------------
+ 9.1 Règles du plan d'action (triées par priorité, 4 actions maximum)
+  Version 4 pages (generer_rapport.py, fonction actions()) :
+  1. URGENT (rouge)   toutes les non-conformités (DGI, FNE, CNPS, ITS, CMU,
+                      DISA) fusionnées en une seule action « Vous mettre en
+                      règle : <liste> » · sous 30 jours · Flow Compta / Sell / RH
+  2. IMPORTANT (noir) délai clients > 60 j : « Faire payer vos clients plus
+                      vite », gain = (délai − 60) / 365 × CA TTC · 3 à 6 mois
+  2. IMPORTANT        trésorerie nette < 0 : « Suivre votre trésorerie chaque
+                      semaine » · dès ce mois-ci · Flow Compta
+  3. UTILE (jaune)    résultat net < 5 % du CA : « Gagner 2 points de marge »,
+                      gain = 2 % × CA par an · 6 à 12 mois · Flow Sell
+  3. UTILE            délai fournisseurs < 30 j ; endettement > 80 %
+  Aucune règle déclenchée : « Piloter avec un tableau de bord mensuel ».
+  Les règles ci-dessous (v2.0) restent la référence des formules de gain.
+
+  P1 (rouge)  FNE NON_ACTIVE / EN_COURS / ND
+              « Activer la facture normalisée électronique (FNE) »
+              gain : « Mise en conformité obligatoire » · délai : sous 30 jours ·
+              outil : Flow Sell · Flow Compta
+  P2 (noir)   CNPS ou ITS / CMU / DISA en retard
+              « Régulariser <liste> » · gain : « Stoppe les majorations de
+              retard » · sous 30 jours · Flow RH
+  P2          trésorerie nette < 0
+              « Plan de trésorerie à 13 semaines » · gain : sortir du découvert
+              (<montant>) · sous 30 jours · Flow Compta
+  P2          délai clients > 60 j
+              gain = (délai − 60) / 365 × CA × coef_tva  → « +X M de trésorerie
+              libérée » · 3 à 6 mois · Flow Sell
+  P3 (jaune)  délai fournisseurs < 45 j
+              gain = (45 − délai) / 365 × achats × coef_tva · 3 à 6 mois ·
+              Flow Compta
+  P3          marge brute < 40 %
+              gain = 2 % × CA → « +X M d'EBE par an » · 6 à 12 mois · Flow Sell
+  P4 (gris)   endettement > 50 %
+              « Stabiliser l'endettement » · 12 mois · Flow Compta
+  Extensions prévues (même structure) : DGI en retard (P1), régime incohérent
+  (P1), capitaux propres négatifs (P1), masse salariale > 35 % (P3),
+  CA en baisse (P2).
+  Règle de rédaction : verbe d'action, une ligne de détail (≤ 75 caractères),
+  gain chiffré quand une formule existe. Les modules Suite Flow sont indiqués
+  comme « outil concerné », sans promesse de fonctionnalité.
+
+ 9.2 Orientation stratégique à 12 mois (3 colonnes fixes, contenu adapté)
+   0–3 mois « Sécuriser » · 3–6 mois « Libérer du cash » ·
+   6–12 mois « Rentabiliser la croissance ». Chaque point n'apparaît que si la
+   règle correspondante du plan d'action s'est déclenchée ; sinon il est
+   remplacé par un point de consolidation (ex. « Maintenir le délai clients
+   sous 60 j »).
+   Version 4 pages : tableau de 3 lignes, cellules courtes (≤ 30 caractères).
+
+ 9.3 Encadré « À savoir »
+   - IMF : si IMF > IS théorique, afficher que l'impôt dû correspond à l'IMF et
+     le seuil de résultat fiscal au-delà duquel l'IS dépasse le plancher
+     (IMF / 25 %), avec la mention « estimation ».
+   - TVA : 18 % (taux normal), 9 % (taux réduit sur certains produits).
+   - Une information sectorielle optionnelle (table paramétrable).
+ 9.4 Prochaines échéances (table paramétrable, 4 lignes)
+   Valeurs pour les entreprises rattachées à un centre des impôts (source PwC
+   2026) ; les grandes et moyennes entreprises ont des dates au 10, 15 ou 20
+   selon le secteur.
+     15 janv. 2027  TVA et ITS du mois de décembre
+     15 févr. 2027  Régularisation annuelle de l'ITS
+     15 avr. 2027   1er acompte d'impôt sur les bénéfices (puis 15 juin, 15 sept.)
+     30 mai 2027    Déclaration annuelle de résultat (30 juin si audit obligatoire)
+
+
+--------------------------------------------------------------------------------
+ 10. APPEL IA N°2 — REFORMULATION DU MARKDOWN (FACULTATIF)
+--------------------------------------------------------------------------------
+ Le rapport est complet sans IA : generer_rapport.py rédige toutes les phrases.
+ L'appel n°2 sert seulement à adapter le ton au secteur ou au dirigeant.
+
+ Entrée : le fichier rapport.md produit par le moteur + GUIDE_MARKDOWN.txt.
+ Prompt système :
+   « Tu es expert-comptable au cabinet DC-KNOWING à Abidjan. Voici un rapport
+   au format Markdown balisé et son guide de syntaxe. Reformule les phrases
+   pour qu'elles soient encore plus claires pour le dirigeant d'une PME
+   ivoirienne. Règles : vouvoiement ; garde EXACTEMENT les mêmes blocs, les
+   mêmes ===PAGE===, les mêmes lignes de tableau et les mêmes nombres ;
+   n'ajoute aucun nombre, aucun texte de loi, aucune promesse ; chaque phrase
+   au plus aussi longue que l'originale. Réponds uniquement avec le Markdown. »
+
+ Paramètres : modèle llama-3.1-70b-instruct, température 0,3, 60 s, 2 essais.
+ Contrôles avant d'accepter la réponse :
+   - mêmes nombres que l'original (regex, tolérance 0) ;
+   - mêmes balises (```…```, > [!…], ===PAGE===, lignes de tableau) ;
+   - rendu Word en 4 pages exactement.
+ Un contrôle échoue → nouvel essai ; second échec → Markdown du moteur.
+
+
+
+--------------------------------------------------------------------------------
+ 11. RAPPORT CLIENT — WORD DE 4 PAGES
+--------------------------------------------------------------------------------
+ 11.1 Chaîne de rendu
+   JSON d'entrée → moteur_rapport.py (calculs) → generer_rapport.py (rédaction)
+   → rapport.md → node md_vers_word.js rapport.md rapport.docx
+   → contrôle : LibreOffice convertit en PDF, pdfinfo compte les pages.
+   Plus de 4 pages → mode compact 1 (retire « En clair »), puis mode compact 2
+   (retire « Comment lire ce rapport », les conseils des indicateurs et la
+   feuille de route). Toujours plus de 4 pages → alerte au conseiller.
+   Commande : python3 word/generer_rapport.py entree.json sortie.docx [--pdf]
+   Correction manuelle : modifier sortie.md, puis relancer md_vers_word.js.
+   Nom des fichiers : Diagnostic_DC-KNOWING_<ref_job>.docx (et .pdf joint).
+
+ 11.2 Mise en page (figée dans md_vers_word.js)
+   A4, marges latérales 1,9 cm ; en-tête : logo + « Journées Portes Ouvertes ·
+   16-18 décembre 2026 » ; pied : « <entreprise> · Diagnostic confidentiel ·
+   Réf. » et « Page X / Y ». Police Arial 11 pt (présente sur tous les postes
+   Word ; les polices web du design system ne sont pas garanties chez le
+   client). Couleurs : noir #000000, or #FFD700, or pâle #FEF9E7, or foncé
+   #785C03 ; feux vert / orange / rouge / gris. Tableaux et blocs insécables
+   (aucun bloc coupé entre deux pages), titres liés au paragraphe suivant.
+
+ 11.3 Contenu (une page = un sujet)
+   Page 1 — Le diagnostic de votre entreprise
+     identité ; 2 notes (santé financière, conformité) avec une phrase chacune ;
+     « Notre avis en une phrase » ; « Ce qu'il faut retenir » (4 points) ;
+     « Comment lire ce rapport ».
+   Page 2 — Votre santé financière, expliquée
+     4 indicateurs (activité, rentabilité, trésorerie, endettement) : une
+     valeur en mots, un feu, une explication, un conseil ; graphique « Pour
+     100 FCFA vendus, où va votre argent ? » + lecture + « En clair ».
+   Page 3 — Votre trésorerie et vos obligations
+     délais clients / fournisseurs en mois (texte) et en jours (graphique avec
+     repères 60 j et 45 j) ; « Le bon réflexe » (trésorerie libérable) ;
+     tableau des obligations (DGI, FNE, régime, CNPS/ITS/CMU/DISA) ;
+     « Bon à savoir » (impôt minimum, échéances).
+   Page 4 — Votre plan d'action
+     4 actions maximum (pourquoi, comment, ce que vous y gagnez, délai, outil
+     Suite Flow) ; feuille de route 0-3 / 3-6 / 6-12 mois ; appel à l'entretien
+     (27 22 42 14 43 · 07 67 13 19 93 · portaildck.dc-knowing.com) ; mention.
+
+ 11.4 Règles de rédaction
+   - Peu de chiffres : un montant en millions arrondis (« 7 millions FCFA »),
+     des durées en mois (« deux mois et demi »), des parts en mots (« près des
+     deux tiers »). Les jours n'apparaissent que dans le graphique des délais.
+   - Pas de sigle comptable sans explication (pas d'EBE, BFR, ratio).
+   - Vouvoiement, phrases courtes, une idée par phrase.
+   - Chaque constat est suivi de ce qu'il veut dire et de ce qu'il faut faire.
+   - Données manquantes : feu gris « Non évalué » et une phrase qui le dit.
+
+ 11.5 Mention obligatoire (bas de page 4)
+   « Diagnostic établi sur vos seuls documents, calculs selon le SYSCOHADA
+   révisé. Ce n'est ni un audit, ni une certification des comptes, ni un avis
+   juridique. »
+
+
+
+--------------------------------------------------------------------------------
+ 12. E-MAIL
+--------------------------------------------------------------------------------
+   Objet : « Votre diagnostic financier — Journées Portes Ouvertes DC-KNOWING »
+   Corps : 3 lignes (scores, verdict, invitation à l'entretien) + lien signé.
+   Rapport Word joint + sa version PDF (≤ 2 Mo visé). Expéditeur vérifié (SPF, DKIM, DMARC).
+   Copie interne au conseiller du jour.
+
+
+--------------------------------------------------------------------------------
+ 13. SÉCURITÉ ET DONNÉES PERSONNELLES (loi n°2013-450, ARTCI)
+--------------------------------------------------------------------------------
+   - Chiffrement au repos : MinIO SSE (AES-256) ; colonnes sensibles chiffrées
+     (pgcrypto). En transit : TLS 1.3.
+   - Anonymisation avant tout appel IA ; aucun nom, NCC, RIB ni téléphone
+     n'est transmis. OpenRouter configuré avec "data_collection": "deny".
+   - Lecture des fichiers dans un conteneur sans réseau.
+   - Rétention : fichiers bruts supprimés après 24 h ; rapports conservés 30 jours
+     puis archivés chiffrés ; journaux IA sans donnée personnelle.
+   - Consentement explicite au formulaire ; notice d'information accessible.
+   - Journal d'audit (qui, quand, quelle action) sur chaque accès fichier ou
+     rapport.
+   - Localisation : serveur au siège si l'hébergement local est exigé, sinon
+     VPS. Point à valider avec le conseil juridique du cabinet (formalités
+     ARTCI éventuelles avant l'événement).
+
+
+--------------------------------------------------------------------------------
+ 14. MODÈLE DE DONNÉES (PostgreSQL 16)
+--------------------------------------------------------------------------------
+   entreprises (id, nom_anonymise, nom_reel*, ncc*, secteur, effectif,
+                regime_fiscal, email_contact*, telephone*, type_client,
+                jour_evenement, consentement_artci, created_at)
+   checkup_jobs (id, entreprise_id, statut, fichiers_source[], fichier_hash,
+                 resultat_ia_json, faits_json, interpretation_json,
+                 score_performance, grade_performance, score_conformite,
+                 grade_conformite, couverture_pct, alertes, plan_action,
+                 docx_path, pdf_path, email_envoye_at, erreur, created_at, completed_at)
+   audit_logs (id, job_id, acteur, action, horodatage, ip)
+   parametres (cle, valeur_json, source, verifie_le)  ← seuils, taux, échéances
+   (* colonnes chiffrées)
+   Statuts : EN_ATTENTE → LECTURE → MAPPING_IA → CALCUL → INTERPRETATION →
+             RAPPORT → ENVOYE | ERREUR
+   Index : statut ; jour_evenement ; created_at.
+
+
+--------------------------------------------------------------------------------
+ 15. API
+--------------------------------------------------------------------------------
+   POST /api/diagnostics            multipart (formulaire + fichiers) → {job_id}
+   GET  /api/diagnostics/{id}       statut + étape + progression
+   GET  /api/diagnostics/{id}/sse   flux d'avancement
+   GET  /api/diagnostics/{id}/pdf   lien signé (7 jours)
+   GET  /api/admin/diagnostics      liste du jour (conseillers, auth JWT)
+   Middlewares : CORS, limitation de débit (5 dépôts / IP / heure), JWT pour
+   l'admin, validation Pydantic, taille maximale 20 Mo.
+
+
+--------------------------------------------------------------------------------
+ 16. PERFORMANCE, ERREURS, REPRISE
+--------------------------------------------------------------------------------
+   Budget : lecture 60 s · IA n°1 120 s · calcul et rédaction 10 s ·
+   IA n°2 (facultatif) 60 s · Word + contrôle PDF 20 s · envoi 15 s → ~5 min.
+   Erreurs : OCR illisible ou confiance globale < 0,30 → pas de rapport
+   automatique ; e-mail d'excuse + rappel par un conseiller ; job en ERREUR
+   visible sur le tableau de bord.
+   Reprise : chaque étape est idempotente et reprend depuis la dernière étape
+   réussie (artefacts intermédiaires stockés).
+   Montée en charge : > 30 entreprises / jour → 4 workers.
+
+
+--------------------------------------------------------------------------------
+ 17. TESTS ET RECETTE
+--------------------------------------------------------------------------------
+   - Tests unitaires : chaque palier des barèmes (sections 7 et 8), y compris
+     les bornes (ex. marge = 40,0 %, CA = 100 M et 200 M pour l'option RSI).
+   - Jeux de fichiers : balance, journal, compte de résultat, bilan, PDF
+     numérisé, fichier Windows-1252, fichier partiel (couverture < 60 %).
+   - Golden file : exemple_entree.json doit produire Performance 50 (C),
+     Conformité 75 (B), couverture 95 %, et le plan d'action en 4 actions :
+     « Vous mettre en règle : FNE et CMU », « Faire payer vos clients plus
+     vite », « Suivre votre trésorerie chaque semaine », « Gagner 2 points de
+     marge ».
+   - Cas limites : entreprise saine (1 action, aucun feu rouge) ; données
+     manquantes + perte + 4 non-conformités (feux gris, mode normal).
+   - Contrôle visuel : 4 pages exactement, aucun bloc ni tableau coupé.
+   - Charge : 15 dépôts simultanés, 95 % des rapports en moins de 10 minutes.
+
+
+--------------------------------------------------------------------------------
+ 18. PLANNING
+--------------------------------------------------------------------------------
+   1–10 déc.    pré-production, tests avec 10 fichiers fictifs
+   11–12 déc.   test de charge (15 dépôts simultanés)
+   14–15 déc.   répétition générale avec l'équipe ; validation des rapports par
+                les managers comptables
+   16 déc. 7 h  mise en service ; supervision Sentry + Grafana
+   16–18 déc.   un développeur d'astreinte (Williams / Agnimel)
+   19–22 déc.   retardataires, archivage, bilan de performance
+
+
+--------------------------------------------------------------------------------
+ 19. PARAMÈTRES DE RÉFÉRENCE ET SOURCES
+--------------------------------------------------------------------------------
+ Paramètre                           Valeur                    Statut
+ TVA                                 18 % ; réduit 9 %         Vérifié (PwC 2026)
+ IS                                  25 % (30 % télécoms, TIC) Vérifié (PwC 2026)
+ IMF                                 0,5 % CA TTC, min 3 M,    Vérifié (PwC 2026)
+                                     max 35 M
+ Régimes (CA HT)                     TEE 5–50 M ; RME 50–200 M Vérifié (PwC 2026)
+                                     (option RSI dès 100 M) ;
+                                     RSI 200–500 M ; RNI > 500 M
+ FNE                                 arrêté n°0337 du 9 mai    Vérifié (Sage CI)
+                                     2025 ; secteurs exemptés
+ CNPS retraite                       7,7 % employeur, 6,3 %    Vérifié (Cleiss, PwC)
+                                     salarié
+ Majoration de retard CNPS           0,05 % par jour           À CONFIRMER (CNPS)
+ Échéances TVA / ITS / IS            voir 9.4                  Vérifié (PwC 2026)
+ Délai DISA                          —                         À CONFIRMER
+ Sanctions FNE                       —                         À CONFIRMER (DGI)
+ Tous ces paramètres sont stockés dans la table « parametres » avec leur
+ source et leur date de vérification ; un changement ne nécessite pas de
+ redéploiement.
+
+ Sources consultées le 25/11/2026 :
+   PwC — Navigating taxation 2026, Côte d'Ivoire :
+     https://www.pwc.com/gh/en/assets/pdf/cote-divoire-tax-facts-figures-2026.pdf
+   Sage — La FNE en Côte d'Ivoire, guide complet :
+     https://www.sage.com/fr-ma/blog/la-fne-en-cote-divoire-guide-complet-sage-cote-divoire/
+   Cleiss — Les cotisations en Côte d'Ivoire :
+     https://www.cleiss.fr/docs/cotisations/cotedivoire.html
+   Loidici — Retard de reversement des cotisations CNPS :
+     https://loidici.biz/?p=29801
+
+
+--------------------------------------------------------------------------------
+ 20. POINTS À VALIDER PAR LE CABINET AVANT LE 10 DÉCEMBRE
+--------------------------------------------------------------------------------
+   1. Taux de majoration CNPS et délai DISA (auprès de la CNPS).
+   2. Sanctions applicables en cas d'absence de FNE (DGI) : le rapport n'en cite
+      aucune à ce jour.
+   3. Repères sectoriels (marges, délais) si le cabinet souhaite des seuils par
+      secteur dès l'événement.
+   4. Formalités ARTCI avant la collecte (conseil juridique du cabinet).
+   5. Validation par un manager comptable du rapport de référence
+      (exemples/) et des formulations du plan d'action.
+   6. Choix de la police Arial pour le Word (lisible partout) ; si le cabinet
+      préfère les polices du design system, il faut les installer sur chaque
+      poste qui ouvrira le .docx.
+================================================================================
