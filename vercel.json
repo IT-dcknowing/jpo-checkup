@@ -1,9 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "echo 'Front statique : aucune compilation'",
+  "buildCommand": "rm -rf public && cp -R checkup360-front/checkup360-front public && rm -rf public/references public/README.md",
   "installCommand": "npm install --omit=dev",
-  "outputDirectory": "checkup360-front/checkup360-front",
+  "outputDirectory": "public",
   "regions": [
     "dub1"
   ],
