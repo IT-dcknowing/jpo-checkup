@@ -39,17 +39,15 @@ class FakeLLM:
 
 @pytest.fixture
 def settings(tmp_path, monkeypatch):
-    for k in ("OPENROUTER_API_KEY", "SMTP_HOST", "ADMIN_PASSWORD", "ADMIN_ACCOUNTS", "SECRET_KEY", "DATA_KEY", "FRONT_DIR"):
+    for k in ("OPENROUTER_API_KEY", "ADMIN_PASSWORD", "ADMIN_ACCOUNTS", "SECRET_KEY", "FRONT_DIR", "DOCX_RENDER_URL", "VERCEL",
+              "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "CRON_SECRET"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("ADMIN_USER", "Conseiller@dc-knowing.ci")
     monkeypatch.setenv("ADMIN_PASSWORD", "mot-de-passe-test")
-    monkeypatch.setenv("APP_ENV", "dev")
-    monkeypatch.setenv("WORKERS", "2")
-    monkeypatch.setenv("LO_WARMUP", "0")
+    monkeypatch.setenv("CRON_SECRET", "secret-cron-test")
     s = Settings()
     s.ensure_dirs()
-    s.code_resend = 0                 # les tests enchaînent les connexions
     s.real_soffice = s.soffice_path   # utilisé par le test PDF uniquement
     s.soffice_path = None             # les autres tests évitent les conversions LibreOffice (lentes)
     return s

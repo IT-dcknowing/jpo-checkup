@@ -1,227 +1,183 @@
-"""Stockage SQLite (WAL) : dépôts, résultats, codes de connexion, entretiens, journal d'audit."""
+"""Accès aux données (Supabase Postgres via PostgREST, clé service_role) : rapports, documents, entretiens, audit.
+
+Un « job » est une ligne de public.rapports, renvoyée sous la forme d'un dict avec les clés historiques du pipeline
+(id, ref, owner, statut = étape fine, ...) pour garder le reste du code inchangé.
+"""
 from __future__ import annotations
 
-import json
-import sqlite3
-import time
-from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+
+from .supa import Supabase
 
 TERMINAUX = ("ENVOYE", "TERMINE", "ERREUR")
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS jobs (
-    id TEXT PRIMARY KEY, ref TEXT NOT NULL, owner TEXT, statut TEXT NOT NULL, progression INTEGER DEFAULT 0,
-    jour_evenement TEXT, secteur TEXT,
-    form_enc TEXT NOT NULL,
-    fichiers_json TEXT DEFAULT '[]',
-    resultat_ia_json TEXT,
-    score_performance INTEGER, grade_performance TEXT,
-    score_conformite INTEGER, grade_conformite TEXT, couverture_pct INTEGER,
-    alertes_json TEXT, plan_action_json TEXT, resume_json TEXT, journal_json TEXT DEFAULT '[]',
-    docx_path TEXT, pdf_path TEXT, md_path TEXT, pages INTEGER,
-    lecture_partielle INTEGER DEFAULT 0, modele_ia TEXT,
-    email_envoye_at TEXT, erreur TEXT, erreur_publique TEXT,
-    rappel_demande INTEGER DEFAULT 0, rappel_effectue INTEGER DEFAULT 0, entretien_realise INTEGER DEFAULT 0,
-    created_at TEXT NOT NULL, completed_at TEXT
-);
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT, acteur TEXT, action TEXT, horodatage TEXT, ip TEXT
-);
-CREATE TABLE IF NOT EXISTS compteurs (annee TEXT PRIMARY KEY, n INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS auth_codes (
-    owner TEXT PRIMARY KEY, code_hash TEXT NOT NULL, expires_at REAL NOT NULL, tries INTEGER NOT NULL DEFAULT 0, sent_at REAL NOT NULL
-);
-CREATE TABLE IF NOT EXISTS entretiens (
-    job_id TEXT PRIMARY KEY, owner TEXT NOT NULL, jour TEXT NOT NULL, heure TEXT NOT NULL, created_at TEXT NOT NULL
-);
-"""
-# Créés après la migration des colonnes (owner peut manquer sur une base plus ancienne)
-INDEXES = """
-CREATE INDEX IF NOT EXISTS idx_jobs_statut ON jobs(statut);
-CREATE INDEX IF NOT EXISTS idx_jobs_jour ON jobs(jour_evenement);
-CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created_at);
-CREATE INDEX IF NOT EXISTS idx_jobs_owner ON jobs(owner);
-CREATE INDEX IF NOT EXISTS idx_ent_jour ON entretiens(jour, heure);
-"""
-MIGRATIONS = {  # colonnes ajoutées depuis la première version du schéma
-    "owner": "TEXT", "resume_json": "TEXT", "journal_json": "TEXT DEFAULT '[]'", "rappel_demande": "INTEGER DEFAULT 0",
-    "rappel_effectue": "INTEGER DEFAULT 0", "entretien_realise": "INTEGER DEFAULT 0",
+# clé du pipeline -> colonne de public.rapports
+COLONNES = {
+    "statut": "etape", "progression": "progression", "score_performance": "score_performance",
+    "grade_performance": "grade_performance", "score_conformite": "score_conformite", "grade_conformite": "grade_conformite",
+    "couverture_pct": "couverture_pct", "docx_path": "chemin_fichier", "md_path": "chemin_markdown", "pages": "pages",
+    "lecture_partielle": "lecture_partielle", "modele_ia": "modele_ia", "email_envoye_at": "envoye_le", "erreur": "erreur",
+    "erreur_publique": "erreur_publique", "rappel_demande": "rappel_demande", "rappel_effectue": "rappel_effectue",
+    "entretien_realise": "entretien_realise", "completed_at": "termine_le", "traitement_depuis": "traitement_depuis",
 }
-COLUMNS = {
-    "statut", "progression", "fichiers_json", "resultat_ia_json", "score_performance", "grade_performance",
-    "score_conformite", "grade_conformite", "couverture_pct", "alertes_json", "plan_action_json", "resume_json",
-    "docx_path", "pdf_path", "md_path", "pages", "lecture_partielle", "modele_ia", "email_envoye_at",
-    "erreur", "erreur_publique", "rappel_demande", "rappel_effectue", "entretien_realise", "completed_at",
-}
+# clés rangées dans la colonne JSON « donnees »
+DONNEES = ("resultat_ia", "alertes", "plan_action", "resume")
+STATUT_GLOBAL = {"ERREUR": "erreur", "ENVOYE": "envoye", "TERMINE": "genere"}
 
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _job(row: dict) -> dict:
+    d = row.get("donnees") or {}
+    return {
+        "id": row["id"], "ref": row["reference"], "owner": row["user_id"], "email": row["email"], "titre": row["titre"],
+        "statut": row["etape"], "statut_global": row["statut"], "progression": row["progression"],
+        "jour_evenement": str(row["jour_evenement"]), "secteur": row["secteur"], "form": row["formulaire"],
+        "resultat_ia": d.get("resultat_ia"), "alertes": d.get("alertes") or [], "plan_action": d.get("plan_action") or [],
+        "resume": d.get("resume") or {}, "donnees": d, "journal": row.get("journal") or [],
+        "score_performance": row["score_performance"], "grade_performance": row["grade_performance"],
+        "score_conformite": row["score_conformite"], "grade_conformite": row["grade_conformite"],
+        "couverture_pct": row["couverture_pct"], "docx_path": row["chemin_fichier"], "md_path": row["chemin_markdown"],
+        "pdf_path": None, "pages": row["pages"], "lecture_partielle": row["lecture_partielle"], "modele_ia": row["modele_ia"],
+        "email_envoye_at": row["envoye_le"], "erreur": row["erreur"], "erreur_publique": row["erreur_publique"],
+        "rappel_demande": row["rappel_demande"], "rappel_effectue": row["rappel_effectue"],
+        "entretien_realise": row["entretien_realise"], "created_at": row["created_at"], "completed_at": row["termine_le"],
+        "traitement_depuis": row.get("traitement_depuis"),
+    }
+
+
 class Database:
-    def __init__(self, path: Path) -> None:
-        self.path = Path(path)
+    def __init__(self, sb: Supabase) -> None:
+        self.sb = sb
 
-    @contextmanager
-    def conn(self):
-        c = sqlite3.connect(self.path, timeout=30)
-        c.row_factory = sqlite3.Row
-        c.execute("PRAGMA journal_mode=WAL")
-        c.execute("PRAGMA busy_timeout=30000")
-        try:
-            yield c
-            c.commit()
-        except Exception:
-            c.rollback()
-            raise
-        finally:
-            c.close()
+    def init(self) -> None:  # le schéma est géré par les migrations (supabase/migrations)
+        return None
 
-    def init(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.conn() as c:
-            c.executescript(SCHEMA)
-            have = {r["name"] for r in c.execute("PRAGMA table_info(jobs)")}
-            for col, typ in MIGRATIONS.items():
-                if col not in have:
-                    c.execute(f"ALTER TABLE jobs ADD COLUMN {col} {typ}")
-            c.executescript(INDEXES)
-
-    # ------------------------------------------------------------------ jobs
-    def create_job(self, job_id: str, form_enc: str, jour: str, secteur: str, owner: str) -> str:
-        """Crée le dépôt et retourne sa référence (JPO-2026-0001, séquentielle par année)."""
-        annee = jour[:4]
-        with self.conn() as c:
-            row = c.execute(
-                "INSERT INTO compteurs(annee, n) VALUES(?, 1) ON CONFLICT(annee) DO UPDATE SET n = n + 1 RETURNING n", (annee,)
-            ).fetchone()
-            ref = f"JPO-{annee}-{row['n']:04d}"
-            c.execute(
-                "INSERT INTO jobs(id, ref, owner, statut, progression, jour_evenement, secteur, form_enc, created_at) "
-                "VALUES(?, ?, ?, 'EN_ATTENTE', 5, ?, ?, ?, ?)",
-                (job_id, ref, owner, jour, secteur, form_enc, now_iso()),
-            )
-        return ref
+    # ------------------------------------------------------------------ rapports
+    def create_job(self, user_id: str, email: str, form: dict, jour: str, secteur: str, titre_entreprise: str) -> dict:
+        ref = self.sb.rpc("prochaine_reference", {"p_annee": jour[:4]})
+        row = self.sb.insert("rapports", {
+            "user_id": user_id, "email": email, "reference": ref, "titre": f"Diagnostic {ref} — {titre_entreprise}"[:200],
+            "jour_evenement": jour, "secteur": secteur, "formulaire": form,
+        })[0]
+        return _job(row)
 
     def get_job(self, job_id: str) -> dict | None:
-        with self.conn() as c:
-            row = c.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-        return dict(row) if row else None
+        row = self.sb.select_one("rapports", {"id": f"eq.{job_id}", "select": "*"})
+        return _job(row) if row else None
 
     def update_job(self, job_id: str, **fields) -> None:
-        bad = set(fields) - COLUMNS
-        if bad:
-            raise ValueError(f"colonnes inconnues : {bad}")
-        if not fields:
-            return
-        sets = ", ".join(f"{k} = ?" for k in fields)
-        with self.conn() as c:
-            c.execute(f"UPDATE jobs SET {sets} WHERE id = ?", (*fields.values(), job_id))
+        values, donnees = {}, {}
+        for k, v in fields.items():
+            if k in DONNEES:
+                donnees[k] = v
+            elif k in COLONNES:
+                values[COLONNES[k]] = v
+                if k == "statut":
+                    values["statut"] = STATUT_GLOBAL.get(v, "en_attente")
+            else:
+                raise ValueError(f"colonne inconnue : {k}")
+        if donnees:  # fusion dans la colonne JSON (lecture puis écriture : un seul traitement à la fois par rapport)
+            cur = self.sb.select_one("rapports", {"id": f"eq.{job_id}", "select": "donnees"}) or {}
+            values["donnees"] = (cur.get("donnees") or {}) | donnees
+        if values:
+            self.sb.update("rapports", {"id": f"eq.{job_id}"}, values)
 
     def list_jobs(self, jour: str | None = None, statut: str | None = None, owner: str | None = None, limit: int = 500) -> list[dict]:
-        where, args = [], []
-        for col, val in (("jour_evenement", jour), ("statut", statut), ("owner", owner)):
-            if val:
-                where.append(f"{col} = ?"); args.append(val)
-        sql = "SELECT * FROM jobs" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY created_at DESC LIMIT ?"
-        with self.conn() as c:
-            return [dict(r) for r in c.execute(sql, (*args, limit)).fetchall()]
+        params = {"select": "*", "order": "created_at.desc", "limit": str(limit)}
+        if jour:
+            params["jour_evenement"] = f"eq.{jour}"
+        if statut:
+            params["etape"] = f"eq.{statut}"
+        if owner:
+            params["user_id"] = f"eq.{owner}"
+        return [_job(r) for r in self.sb.select("rapports", params)]
 
-    def unfinished_jobs(self) -> list[str]:
-        marks = ",".join("?" * len(TERMINAUX))
-        with self.conn() as c:
-            return [r["id"] for r in c.execute(f"SELECT id FROM jobs WHERE statut NOT IN ({marks}) ORDER BY created_at", TERMINAUX)]
+    def count_recent(self, owner: str, hours: int = 1) -> int:
+        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+        return len(self.sb.select("rapports", {"select": "id", "user_id": f"eq.{owner}", "created_at": f"gte.{since}"}))
 
     def jobs_older_than(self, delta: timedelta) -> list[dict]:
-        limite = (datetime.now(timezone.utc) - delta).isoformat(timespec="seconds")
-        with self.conn() as c:
-            return [dict(r) for r in c.execute("SELECT * FROM jobs WHERE created_at < ?", (limite,)).fetchall()]
+        limite = (datetime.now(timezone.utc) - delta).isoformat()
+        return [_job(r) for r in self.sb.select("rapports", {"select": "*", "created_at": f"lt.{limite}"})]
+
+    def stale_jobs(self, minutes: int) -> list[dict]:
+        """Traitements interrompus (fonction arrêtée) : non terminés et sans activité depuis `minutes`."""
+        limite = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+        rows = self.sb.select("rapports", {"select": "*", "etape": "not.in.(TERMINE,ENVOYE,ERREUR)", "created_at": f"lt.{limite}"})
+        return [_job(r) for r in rows if not r.get("traitement_depuis") or r["traitement_depuis"] < limite]
 
     def log_event(self, job_id: str, statut: str, progression: int, event: dict) -> None:
-        """Change d'étape ET ajoute l'événement au journal en une seule transaction : le flux SSE (qui relit le journal) et
-        GET /diagnostics/{id} (que le front appelle dès l'événement final) voient toujours un état cohérent."""
-        with self.conn() as c:
-            c.execute("BEGIN IMMEDIATE")
-            row = c.execute("SELECT journal_json FROM jobs WHERE id = ?", (job_id,)).fetchone()
-            if not row:
-                return
-            journal = json.loads(row["journal_json"] or "[]")
-            journal.append(event)
-            c.execute("UPDATE jobs SET statut = ?, progression = ?, journal_json = ? WHERE id = ?",
-                      (statut, progression, json.dumps(journal, ensure_ascii=False), job_id))
+        self.sb.rpc("journaliser", {"p_id": job_id, "p_etape": statut, "p_progression": progression, "p_evenement": event})
 
-    def delete_owner(self, owner: str) -> list[str]:
-        """Droit à l'effacement : supprime dépôts, entretiens et code d'un visiteur ; retourne les identifiants supprimés."""
-        with self.conn() as c:
-            ids = [r["id"] for r in c.execute("SELECT id FROM jobs WHERE owner = ?", (owner,))]
-            c.execute("DELETE FROM jobs WHERE owner = ?", (owner,))
-            c.execute("DELETE FROM entretiens WHERE owner = ?", (owner,))
-            c.execute("DELETE FROM auth_codes WHERE owner = ?", (owner,))
-        return ids
+    def claim(self, job_id: str, bail_seconds: int = 330) -> bool:
+        return bool(self.sb.rpc("prendre_traitement", {"p_id": job_id, "p_bail_secondes": bail_seconds}))
 
-    # ------------------------------------------------------------------ codes de connexion
-    def save_code(self, owner: str, code_hash: str, ttl: int) -> None:
-        now = time.time()
-        with self.conn() as c:
-            c.execute("INSERT INTO auth_codes(owner, code_hash, expires_at, tries, sent_at) VALUES(?, ?, ?, 0, ?) "
-                      "ON CONFLICT(owner) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, "
-                      "tries = 0, sent_at = excluded.sent_at", (owner, code_hash, now + ttl, now))
+    def release(self, job_id: str) -> None:
+        self.sb.update("rapports", {"id": f"eq.{job_id}"}, {"traitement_depuis": None})
 
-    def get_code(self, owner: str) -> dict | None:
-        with self.conn() as c:
-            row = c.execute("SELECT * FROM auth_codes WHERE owner = ?", (owner,)).fetchone()
-        return dict(row) if row else None
+    # ------------------------------------------------------------------ documents
+    def documents_for(self, user_id: str, ids: list[str]) -> list[dict]:
+        if not ids:
+            return []
+        rows = self.sb.select("documents", {"select": "*", "user_id": f"eq.{user_id}", "id": f"in.({','.join(ids)})"})
+        order = {i: n for n, i in enumerate(ids)}
+        return sorted(rows, key=lambda r: order.get(r["id"], 99))
 
-    def bump_tries(self, owner: str) -> int:
-        with self.conn() as c:
-            row = c.execute("UPDATE auth_codes SET tries = tries + 1 WHERE owner = ? RETURNING tries", (owner,)).fetchone()
-        return row["tries"] if row else 0
+    def attach_documents(self, job_id: str, ids: list[str]) -> None:
+        self.sb.update("documents", {"id": f"in.({','.join(ids)})"}, {"rapport_id": job_id})
 
-    def delete_code(self, owner: str) -> None:
-        with self.conn() as c:
-            c.execute("DELETE FROM auth_codes WHERE owner = ?", (owner,))
+    def job_documents(self, job_id: str) -> list[dict]:
+        return self.sb.select("documents", {"select": "*", "rapport_id": f"eq.{job_id}", "order": "created_at.asc"})
+
+    def documents_older_than(self, delta: timedelta) -> list[dict]:
+        limite = (datetime.now(timezone.utc) - delta).isoformat()
+        return self.sb.select("documents", {"select": "id,chemin", "created_at": f"lt.{limite}"})
+
+    def delete_documents(self, ids: list[str]) -> None:
+        if ids:
+            self.sb.delete("documents", {"id": f"in.({','.join(ids)})"})
+
+    def owner_documents(self, owner: str) -> list[dict]:
+        return self.sb.select("documents", {"select": "id,chemin", "user_id": f"eq.{owner}"})
+
+    # ------------------------------------------------------------------ profils
+    def update_profile(self, user_id: str, **values) -> None:
+        self.sb.update("profiles", {"id": f"eq.{user_id}"}, values)
 
     # ------------------------------------------------------------------ entretiens
     def taken_slots(self, jour: str, capacity: int, exclude_owner: str | None = None) -> list[str]:
-        with self.conn() as c:
-            rows = c.execute("SELECT heure, COUNT(*) AS n FROM entretiens WHERE jour = ? AND (? IS NULL OR owner != ?) GROUP BY heure",
-                             (jour, exclude_owner, exclude_owner)).fetchall()
-        return sorted(r["heure"] for r in rows if r["n"] >= capacity)
+        rows = self.sb.rpc("creneaux_pris", {"p_jour": jour, "p_capacite": capacity, "p_exclure": exclude_owner})
+        return sorted(r if isinstance(r, str) else next(iter(r.values())) for r in rows or [])
 
     def book_slot(self, job_id: str, owner: str, jour: str, heure: str, capacity: int) -> bool:
-        """Réserve (ou déplace) l'entretien d'un dépôt ; False si le créneau est complet."""
-        with self.conn() as c:
-            c.execute("BEGIN IMMEDIATE")
-            n = c.execute("SELECT COUNT(*) AS n FROM entretiens WHERE jour = ? AND heure = ? AND job_id != ?", (jour, heure, job_id)).fetchone()["n"]
-            if n >= capacity:
-                return False
-            c.execute("INSERT INTO entretiens(job_id, owner, jour, heure, created_at) VALUES(?, ?, ?, ?, ?) "
-                      "ON CONFLICT(job_id) DO UPDATE SET jour = excluded.jour, heure = excluded.heure", (job_id, owner, jour, heure, now_iso()))
-        return True
+        return bool(self.sb.rpc("reserver_entretien", {"p_rapport": job_id, "p_user": owner, "p_jour": jour, "p_heure": heure,
+                                                       "p_capacite": capacity}))
 
     def get_booking(self, job_id: str) -> dict | None:
-        with self.conn() as c:
-            row = c.execute("SELECT jour, heure FROM entretiens WHERE job_id = ?", (job_id,)).fetchone()
-        return dict(row) if row else None
+        row = self.sb.select_one("entretiens", {"select": "jour,heure", "rapport_id": f"eq.{job_id}"})
+        return {"jour": str(row["jour"]), "heure": row["heure"]} if row else None
+
+    def bookings_for(self, job_ids: list[str]) -> dict[str, dict]:
+        if not job_ids:
+            return {}
+        rows = self.sb.select("entretiens", {"select": "rapport_id,jour,heure", "rapport_id": f"in.({','.join(job_ids)})"})
+        return {r["rapport_id"]: {"jour": str(r["jour"]), "heure": r["heure"]} for r in rows}
 
     def latest_booking(self, owner: str) -> dict | None:
-        with self.conn() as c:
-            row = c.execute("SELECT jour, heure FROM entretiens WHERE owner = ? ORDER BY created_at DESC LIMIT 1", (owner,)).fetchone()
-        return dict(row) if row else None
+        row = self.sb.select_one("entretiens", {"select": "jour,heure", "user_id": f"eq.{owner}", "order": "created_at.desc"})
+        return {"jour": str(row["jour"]), "heure": row["heure"]} if row else None
+
+    # ------------------------------------------------------------------ effacement
+    def delete_owner(self, owner: str) -> list[dict]:
+        """Droit à l'effacement : supprime les rapports (documents et entretiens en cascade) ; retourne les rapports supprimés."""
+        return [_job(r) for r in self.sb.delete("rapports", {"user_id": f"eq.{owner}"})]
 
     # ------------------------------------------------------------------ audit
     def audit(self, job_id: str | None, acteur: str, action: str, ip: str | None = None) -> None:
-        with self.conn() as c:
-            c.execute("INSERT INTO audit_logs(job_id, acteur, action, horodatage, ip) VALUES(?, ?, ?, ?, ?)",
-                      (job_id, acteur, action, now_iso(), ip))
+        self.sb.insert("audit_logs", {"rapport_id": job_id, "acteur": acteur[:120], "action": action[:120], "ip": ip})
 
     def audit_for(self, job_id: str) -> list[dict]:
-        with self.conn() as c:
-            return [dict(r) for r in c.execute("SELECT acteur, action, horodatage, ip FROM audit_logs WHERE job_id = ? ORDER BY id", (job_id,))]
-
-
-def loads(text: str | None, default=None):
-    return json.loads(text) if text else default
+        return self.sb.select("audit_logs", {"select": "acteur,action,horodatage,ip", "rapport_id": f"eq.{job_id}", "order": "id.asc"})

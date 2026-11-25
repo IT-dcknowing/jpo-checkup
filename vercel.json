@@ -1,0 +1,35 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "",
+  "installCommand": "npm install --omit=dev",
+  "outputDirectory": "checkup360-front/checkup360-front",
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 300,
+      "includeFiles": "{backend/app/**,moteur_rapport.py,word/generer_rapport.py}",
+      "excludeFiles": "{backend/tests/**,exemples/**,word/node_modules/**,node_modules/**,checkup360-front/**,supabase/**}"
+    },
+    "api/docx.js": {
+      "maxDuration": 60,
+      "includeFiles": "word/{fonts/**,logo.png}"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/:path((?!docx$).*)", "destination": "/api/index" }
+  ],
+  "crons": [
+    { "path": "/api/cron/purge", "schedule": "17 3 * * *" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    },
+    { "source": "/conseiller.html", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }
+  ]
+}

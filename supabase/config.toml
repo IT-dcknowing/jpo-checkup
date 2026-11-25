@@ -1,0 +1,65 @@
+# Configuration Supabase (CLI) — référence des réglages appliqués au projet hhzwzoantzhgtsbrtswr.
+# Les réglages Auth (SMTP, modèles, URLs) se règlent dans le tableau de bord : voir DEPLOIEMENT.md, étape 2.
+project_id = "jpo-checkup"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+max_rows = 1000
+
+[db]
+major_version = 17
+
+[storage]
+enabled = true
+file_size_limit = "20MiB"
+
+[auth]
+enabled = true
+# Lien provisoire (Vercel) ; ajouter le domaine définitif dans additional_redirect_urls le moment venu
+site_url = "https://jpo-checkup.vercel.app"
+additional_redirect_urls = ["https://jpo-checkup.vercel.app/**", "http://localhost:8000/**", "http://localhost:3000/**"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+enable_signup = true
+
+[auth.rate_limit]
+email_sent = 30
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true      # confirmation obligatoire de l'adresse (le code à 6 chiffres la confirme)
+secure_password_change = true
+otp_length = 6
+otp_expiry = 600                 # 10 minutes
+max_frequency = "60s"
+
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"     # jamais en clair dans le dépôt
+admin_email = "diagnostic@dc-knowing.com"
+sender_name = "DC-KNOWING · Diagnostic JPO"
+
+[auth.email.template.confirmation]
+subject = "Confirmez votre adresse — Check-up 360 DC-KNOWING"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.magic_link]
+subject = "Votre code d’accès — Check-up 360 DC-KNOWING"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.recovery]
+subject = "Réinitialisation de votre accès — Check-up 360 DC-KNOWING"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.email_change]
+subject = "Confirmez votre nouvelle adresse — Check-up 360 DC-KNOWING"
+content_path = "./supabase/templates/email_change.html"
+
+[functions.envoyer-rapport]
+verify_jwt = false               # authentification faite dans la fonction (jeton visiteur ou clé service_role)

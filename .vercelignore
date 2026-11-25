@@ -1,0 +1,10 @@
+# Non déployé : maquettes internes, exemples, tests, données locales
+checkup360-front/checkup360-front/references
+exemples
+backend/tests
+backend/data
+backend/.venv
+word/node_modules
+*.md
+!checkup360-front/**/README.md
+SPEC_TECHNIQUE_*.txt

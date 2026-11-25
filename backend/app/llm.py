@@ -115,7 +115,11 @@ class OpenRouterClient:
         if not self.s.openrouter_api_key:
             raise LLMAuthError("OPENROUTER_API_KEY n'est pas renseignée (fichier backend/.env)")
         errors: list[str] = []
+        debut = time.monotonic()
         for model in self.s.llm_models:
+            if self.s.llm_budget and errors and time.monotonic() - debut > self.s.llm_budget:
+                errors.append("budget de temps de l'analyse dépassé")
+                break
             messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
             for essai in range(2):  # essai initial + une relance avec le message d'erreur (spec §4.3)
                 try:

@@ -32,7 +32,7 @@ class Component extends DCLogic {
         ['Vérification', 'Vérifiez et lancez', 'Un dernier coup d’œil avant l’analyse. Vous pouvez modifier chaque bloc.']
       ],
       SLOTS: ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'],
-      STAGES: [['Lecture', 'Fichiers, encodage, OCR'], ['Analyse', 'Extraction IA et contrôles'], ['Calcul', 'Indicateurs et scores'], ['Rapport', 'Interprétation et PDF'], ['Envoyé', 'E-mail et Mes diagnostics']],
+      STAGES: [['Lecture', 'Fichiers, encodage, OCR'], ['Analyse', 'Extraction IA et contrôles'], ['Calcul', 'Indicateurs et scores'], ['Rapport', 'Interprétation et rapport Word'], ['Envoyé', 'E-mail et Mes diagnostics']],
       ETAPE: { EN_ATTENTE: 0, LECTURE: 0, MAPPING_IA: 1, CALCUL: 2, INTERPRETATION: 3, PDF: 3, ENVOYE: 5 },
       PROG: {
         '2026-12-16': [['08:30', 'Accueil des visiteurs', 'Enregistrement et remise des badges'], ['09:00', 'Ouverture par le cabinet DC-KNOWING', ''], ['09:30', 'Check-up 360 et entretiens individuels', 'En continu jusqu’à 17h30', 'diag'], ['10:30', 'Présentation des 5 applications de La Suite Flow', 'Sell, RH, Compta, Legal, Task'], ['14:30', 'Atelier : la FNE en pratique', 'Avec Flow Sell et Flow Compta'], ['16:30', 'Démonstrations libres', '']],
@@ -64,6 +64,10 @@ class Component extends DCLogic {
     }, 1000);
     const e = this.props.ecran;
     if (e && API.config.mock) this.demoScreen(e);
+    // Session ouverte depuis un lien reçu par e-mail (ou un autre onglet)
+    if (API.onSession) API.onSession((sess) => { this.setState({ user: { email: sess.email } }, () => this.refreshDiags()); });
+    const linkErr = API.linkError && API.linkError();
+    if (linkErr) { this.setState({ screen: 'auth' }); this.toast('bad', 'Lien expiré', linkErr); }
   }
   componentWillUnmount() { this.clearT(); clearInterval(this.tick); this.stopPoll(); if (this.unsub) this.unsub(); }
   componentDidUpdate(pp, ps) {
@@ -280,7 +284,7 @@ class Component extends DCLogic {
     API.pdfUrl(id).then((r) => {
       this.setState({ dl: null });
       if (r && r.url) window.open(r.url, '_blank', 'noopener');
-      this.toast('info', 'Diagnostic_DC-KNOWING_' + ref + '.pdf', API.config.mock ? 'Aperçu du rapport ouvert (mode démo).' : 'Lien signé valable 7 jours.');
+      this.toast('info', 'Diagnostic_DC-KNOWING_' + ref + (API.config.mock ? '.pdf' : '.docx'), API.config.mock ? 'Aperçu du rapport ouvert (mode démo).' : 'Lien sécurisé valable 7 jours.');
     }).catch((e) => { this.setState({ dl: null }); this.fail(e, 'Rapport indisponible'); });
   }
   goHomeNow() {

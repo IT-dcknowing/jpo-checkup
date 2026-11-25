@@ -1,0 +1,6 @@
+Sujets des e-mails (Supabase > Authentication > Emails > Templates)
+
+confirmation.html : Confirmez votre adresse — Check-up 360 DC-KNOWING
+magic_link.html : Votre code d’accès — Check-up 360 DC-KNOWING
+recovery.html : Réinitialisation de votre accès — Check-up 360 DC-KNOWING
+email_change.html : Confirmez votre nouvelle adresse — Check-up 360 DC-KNOWING
