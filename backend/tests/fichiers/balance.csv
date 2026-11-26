@@ -1,0 +1,29 @@
+Compte;Libellé;Débit;Crédit;Solde
+101000;Capital social;0;10000000;-10000000
+106000;Réserves;0;25000000;-25000000
+120000;Résultat de l'exercice;0;18500000;-18500000
+162000;Emprunts bancaires;0;30000000;-30000000
+241000;Matériel et outillage;45000000;0;45000000
+284000;Amortissements du matériel;0;15000000;-15000000
+311000;Marchandises en stock;38000000;0;38000000
+401000;Fournisseurs;0;52000000;-52000000
+411000;Clients;89000000;0;89000000
+421000;Personnel rémunérations dues;0;4000000;-4000000
+431000;CNPS;0;2500000;-2500000
+441000;État impôt sur les bénéfices;0;6000000;-6000000
+521000;Banque;4000000;0;4000000
+565000;Concours bancaires courants;0;12500000;-12500000
+571000;Caisse;500000;0;500000
+601000;Achats de marchandises;290000000;0;290000000
+603000;Variation de stock de marchandises;2000000;0;2000000
+622000;Locations;9600000;0;9600000
+624000;Entretien et réparations;3400000;0;3400000
+628000;Frais de télécommunication;1800000;0;1800000
+641000;Impôts et taxes;2100000;0;2100000
+661000;Rémunérations du personnel;54000000;0;54000000
+664000;Charges sociales;9700000;0;9700000
+671000;Intérêts des emprunts;3900000;0;3900000
+681000;Dotations aux amortissements;5000000;0;5000000
+891000;Impôt sur le résultat;6000000;0;6000000
+701000;Ventes de marchandises;0;420000000;-420000000
+707000;Produits accessoires;0;5000000;-5000000

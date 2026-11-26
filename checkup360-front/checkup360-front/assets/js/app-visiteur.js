@@ -22,17 +22,18 @@ class Component extends DCLogic {
       FNE: [['ACTIVE', 'Activée'], ['EN_COURS_ACTIVATION', 'Activation en cours'], ['NON_ACTIVE', 'Non activée'], ['NE_SAIT_PAS', 'Je ne sais pas']],
       STAT: [['A_JOUR', 'À jour'], ['EN_RETARD', 'En retard'], ['NE_SAIT_PAS', 'Ne sait pas']],
       OBL: [['DGI', 'Déclarations fiscales'], ['CNPS', 'Cotisations sociales'], ['ITS', 'Impôt sur traitements et salaires'], ['CMU', 'Couverture maladie universelle'], ['DISA', 'Déclaration individuelle des salaires annuels']],
-      DOCS: [['balance', 'Balance générale', 'Le plus complet : il suffit souvent à lui seul.', true], ['cr', 'Compte de résultat', 'Chiffre d’affaires, achats, charges et résultat.', false], ['bilan', 'Bilan', 'Actif, passif, trésorerie et dettes.', false], ['autre', 'Autre document', 'Grand livre, journal ou déclarations.', false]],
+      MAX_FILES: 10,
+      DOCS: [['balance', 'Balance générale', 'Le plus complet : il suffit souvent à lui seul.', true], ['cr', 'Compte de résultat', 'Chiffre d’affaires, achats, charges et résultat.', false], ['bilan', 'Bilan', 'Actif, passif, trésorerie et dettes.', false], ['autre', 'Autres documents', 'Plusieurs fichiers possibles : journaux de ventes, d’achats, de paie, grand livre…', false]],
       STEPS: [
         ['Entreprise', 'Votre entreprise', 'Ces informations identifient le dossier et choisissent les repères adaptés à votre secteur.'],
         ['Vous', 'Vous et votre visite', 'Pour vous rappeler si besoin et préparer votre invitation au bon jour.'],
         ['Fiscalité', 'Votre fiscalité', 'Nous vérifions que votre régime correspond à votre chiffre d’affaires. « Je ne sais pas » est accepté.'],
         ['Obligations', 'Vos obligations déclaratives', 'Une réponse par ligne. Elles alimentent votre score de conformité.'],
-        ['Documents', 'Vos documents comptables', 'Un fichier par emplacement, 3 au maximum. La balance générale suffit souvent.'],
+        ['Documents', 'Vos documents comptables', 'Jusqu’à 10 fichiers. La balance générale suffit souvent ; à défaut, déposez tous vos journaux et relevés dans « Autres documents ».'],
         ['Vérification', 'Vérifiez et lancez', 'Un dernier coup d’œil avant l’analyse. Vous pouvez modifier chaque bloc.']
       ],
       SLOTS: ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'],
-      STAGES: [['Lecture', 'Fichiers, encodage, OCR'], ['Analyse', 'Extraction IA et contrôles'], ['Calcul', 'Indicateurs et scores'], ['Rapport', 'Interprétation et PDF'], ['Envoyé', 'E-mail et Mes diagnostics']],
+      STAGES: [['Lecture', 'Fichiers, encodage, OCR'], ['Analyse', 'Extraction IA et contrôles'], ['Calcul', 'Indicateurs et scores'], ['Rapport', 'Interprétation et rapport Word'], ['Envoyé', 'E-mail et Mes diagnostics']],
       ETAPE: { EN_ATTENTE: 0, LECTURE: 0, MAPPING_IA: 1, CALCUL: 2, INTERPRETATION: 3, PDF: 3, ENVOYE: 5 },
       PROG: {
         '2026-12-16': [['08:30', 'Accueil des visiteurs', 'Enregistrement et remise des badges'], ['09:00', 'Ouverture par le cabinet DC-KNOWING', ''], ['09:30', 'Check-up 360 et entretiens individuels', 'En continu jusqu’à 17h30', 'diag'], ['10:30', 'Présentation des 5 applications de La Suite Flow', 'Sell, RH, Compta, Legal, Task'], ['14:30', 'Atelier : la FNE en pratique', 'Avec Flow Sell et Flow Compta'], ['16:30', 'Démonstrations libres', '']],
@@ -64,6 +65,10 @@ class Component extends DCLogic {
     }, 1000);
     const e = this.props.ecran;
     if (e && API.config.mock) this.demoScreen(e);
+    // Session ouverte depuis un lien reçu par e-mail (ou un autre onglet)
+    if (API.onSession) API.onSession((sess) => { this.setState({ user: { email: sess.email } }, () => this.refreshDiags()); });
+    const linkErr = API.linkError && API.linkError();
+    if (linkErr) { this.setState({ screen: 'auth' }); this.toast('bad', 'Lien expiré', linkErr); }
   }
   componentWillUnmount() { this.clearT(); clearInterval(this.tick); this.stopPoll(); if (this.unsub) this.unsub(); }
   componentDidUpdate(pp, ps) {
@@ -192,15 +197,24 @@ class Component extends DCLogic {
     if (this.state.step < 6) this.setState((s) => ({ step: s.step + 1, err: {} }));
     else this.launch();
   }
+  /* Case « Autre document » : plusieurs fichiers (sélection multiple ou glisser-déposer) */
+  putFiles(slot, list) {
+    const arr = Array.from(list || []);
+    if (slot !== 'autre') { this.putFile(slot, arr[0]); return; }
+    arr.forEach((fl) => this.putFile('autre:' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), fl));
+  }
   putFile(slot, fl) {
     if (!fl) return;
+    const MAX = this.K.MAX_FILES;
     const ext = (fl.name.split('.').pop() || '').toLowerCase();
     if (!['csv', 'xlsx', 'pdf'].includes(ext)) { this.toast('bad', 'Format non accepté', fl.name + ' : CSV, XLSX ou PDF uniquement.'); this.setState({ dragSlot: null }); return; }
     if (fl.size > 20 * 1024 * 1024) { this.toast('bad', 'Fichier trop lourd', fl.name + ' dépasse 20 Mo.'); this.setState({ dragSlot: null }); return; }
     const files = { ...this.state.files };
-    if (!files[slot] && Object.keys(files).length >= 3) { this.toast('bad', 'Maximum atteint', '3 fichiers par diagnostic.'); return; }
+    if (!files[slot] && Object.keys(files).length >= MAX) { this.toast('bad', 'Maximum atteint', MAX + ' fichiers par diagnostic.'); this.setState({ dragSlot: null }); return; }
+    if (Object.values(files).some((x) => x.name === fl.name && x.size === fl.size)) { this.toast('info', 'Déjà ajouté', fl.name); this.setState({ dragSlot: null }); return; }
     files[slot] = { name: fl.name, size: fl.size, ext };
     this.fileObjs[slot] = fl;
+    this.state.files = files; // plusieurs ajouts dans le même tour (sélection multiple)
     this.setState((s) => ({ files, dragSlot: null, err: { ...s.err, files: null } }));
     this.toast('ok', 'Fichier ajouté', fl.name);
   }
@@ -250,8 +264,8 @@ class Component extends DCLogic {
         return patch;
       });
       if (ev.etape === 'ERREUR') {
-        this.setState({ failed: true });
-        this.toast('bad', 'Lecture impossible', 'Un conseiller va vous rappeler.');
+        this.setState({ failed: true, failMsg: ev.message || '' });
+        this.toast('bad', 'Diagnostic interrompu', 'Un conseiller va vous rappeler.');
         this.refreshDiags();
       }
       if (ev.etape === 'ENVOYE') {
@@ -280,7 +294,7 @@ class Component extends DCLogic {
     API.pdfUrl(id).then((r) => {
       this.setState({ dl: null });
       if (r && r.url) window.open(r.url, '_blank', 'noopener');
-      this.toast('info', 'Diagnostic_DC-KNOWING_' + ref + '.pdf', API.config.mock ? 'Aperçu du rapport ouvert (mode démo).' : 'Lien signé valable 7 jours.');
+      this.toast('info', 'Diagnostic_DC-KNOWING_' + ref + (API.config.mock ? '.pdf' : '.docx'), API.config.mock ? 'Aperçu du rapport ouvert (mode démo).' : 'Lien sécurisé valable 7 jours.');
     }).catch((e) => { this.setState({ dl: null }); this.fail(e, 'Rapport indisponible'); });
   }
   goHomeNow() {
@@ -320,18 +334,19 @@ class Component extends DCLogic {
       { t: 'Obligations', edit: goStep(4), editL: 'Modifier les obligations', rows: K.OBL.map(([k]) => ({ l: k, v: f.statuts[k] ? label(K.STAT, f.statuts[k]) : '—' })) },
       { t: 'Documents', edit: goStep(5), editL: 'Modifier les documents', rows: fileList.length ? fileList.map((x) => ({ l: x.ext.toUpperCase(), v: x.name })) : [{ l: 'Fichiers', v: 'Aucun' }] }
     ];
-    const summary = [{ l: 'Entreprise', v: f.raison || '—' }, { l: 'Secteur', v: f.secteur || '—' }, { l: 'Visite', v: label(K.JOUR, f.jour) }, { l: 'E-mail', v: userEmail || '—' }, { l: 'Fichiers', v: fileList.length + ' / 3' }];
-    const full = fileList.length >= 3;
-    const docSlots = K.DOCS.map(([k, l, d, rec]) => {
+    const summary = [{ l: 'Entreprise', v: f.raison || '—' }, { l: 'Secteur', v: f.secteur || '—' }, { l: 'Visite', v: label(K.JOUR, f.jour) }, { l: 'E-mail', v: userEmail || '—' }, { l: 'Fichiers', v: fileList.length + ' / ' + K.MAX_FILES }];
+    const full = fileList.length >= K.MAX_FILES;
+    const autres = Object.keys(s.files).filter((k) => k.startsWith('autre:'));
+    const docSlots = K.DOCS.flatMap(([k0, l, d, rec]) => (k0 === 'autre' ? [...autres, 'autre'] : [k0]).map((k) => {
       const x = s.files[k];
-      const pick = (e) => { this.putFile(k, e.target.files && e.target.files[0]); e.target.value = ''; };
+      const pick = (e) => { this.putFiles(k, e.target.files); e.target.value = ''; };
       return { k, l, d, rec, isFilled: !!x, isEmpty: !x && !full, isOff: !x && full, over: s.dragSlot === k ? 'over' : '', aria: 'Déposer : ' + l, replaceAria: 'Remplacer ' + l, removeAria: 'Retirer ' + l,
         name: x ? x.name : '', size: x ? this.fmtSize(x.size) : '', ext: x ? x.ext.toUpperCase() : '', pick,
         dragOver: (e) => { e.preventDefault(); if (s.dragSlot !== k) this.setState({ dragSlot: k }); },
         dragLeave: (e) => { e.preventDefault(); this.setState({ dragSlot: null }); },
-        drop: (e) => { e.preventDefault(); this.putFile(k, e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]); },
+        drop: (e) => { e.preventDefault(); this.putFiles(k, e.dataTransfer && e.dataTransfer.files); },
         remove: () => { delete this.fileObjs[k]; this.setState((st) => { const files = { ...st.files }; delete files[k]; return { files }; }); } };
-    });
+    }));
     const remainMin = Math.max(1, Math.round((6 - s.step) * 0.5 + 0.5));
 
     const pct = s.done ? 100 : Math.min(99, s.pct);
@@ -397,7 +412,7 @@ class Component extends DCLogic {
       stepPct: Math.round((s.step - 1) / 6 * 100 + 8),
       canBack: s.step > 1, noBack: s.step === 1, isLast: s.step === 6, notLast: s.step < 6,
       fileCount: fileList.length, fileCountCls: full ? 'b-acc' : fileList.length ? 'b-ok' : '',
-      failed: s.failed, allDone: s.done && s.screen === 'suivi', elapsedL: this.fmtT(elapsedSec), remainL,
+      failed: s.failed, failMsg: s.failMsg || 'Votre diagnostic n’a pas pu être produit automatiquement.', allDone: s.done && s.screen === 'suivi', elapsedL: this.fmtT(elapsedSec), remainL,
       barCls: running ? 'stripes' : '', barColor: s.failed ? '#DC2626' : s.done ? '#15803D' : '#FFD700',
       job: s.job, entreprise: f.raison || 'Votre entreprise', emailShown: userEmail || 'votre adresse e-mail', telShown: f.tel || 'votre numéro',
       count: s.count, confetti: s.confetti,

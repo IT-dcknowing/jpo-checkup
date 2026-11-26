@@ -70,7 +70,7 @@ Règles affichées à l'écran : code à 6 chiffres, valable 10 minutes, 3 essai
 
 | Méthode | Route | Détail |
 |---|---|---|
-| POST | `/api/diagnostics` | multipart : champs ci-dessous + `fichiers` (1 à 3) + `types_fichiers` (`balance`, `cr`, `bilan`, `autre`, même ordre). Réponse `{ "job_id", "reference" }`. Erreurs gérées : 401, 413, 422, 429 |
+| POST | `/api/diagnostics` | multipart : champs ci-dessous + `fichiers` (1 à 10) + `types_fichiers` (`balance`, `cr`, `bilan`, `autre`, même ordre). Réponse `{ "job_id", "reference" }`. Erreurs gérées : 401, 413, 422, 429 |
 | GET | `/api/diagnostics/{id}/sse` | flux d'avancement (voir plus bas) |
 | GET | `/api/diagnostics/{id}` | résumé du diagnostic (champs ci-dessous) |
 | GET | `/api/diagnostics/{id}/pdf` | `{ "url" }` — lien signé valable 7 jours |

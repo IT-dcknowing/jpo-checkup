@@ -1,4 +1,4 @@
-"""Jetons signés, chiffrement des données personnelles, limitation de débit."""
+"""Jetons signés (espace conseiller) et limitation de débit."""
 from __future__ import annotations
 
 import base64
@@ -8,7 +8,6 @@ import threading
 import time
 from collections import defaultdict, deque
 
-from cryptography.fernet import Fernet
 
 
 def _b64(b: bytes) -> str:
@@ -43,28 +42,6 @@ def verify_token(secret: str, token: str, kind: str) -> str | None:
         return subject
     except Exception:
         return None
-
-
-def owner_hash(secret: str, email: str) -> str:
-    """Identifiant pseudonyme d'un visiteur (HMAC de son e-mail) : permet de retrouver ses dépôts sans stocker l'e-mail en clair."""
-    return hmac.new(secret.encode(), email.strip().lower().encode(), hashlib.sha256).hexdigest()[:32]
-
-
-def code_hash(secret: str, owner: str, code: str) -> str:
-    return hmac.new(secret.encode(), f"{owner}:{code}".encode(), hashlib.sha256).hexdigest()
-
-
-class Cipher:
-    """Chiffrement symétrique (Fernet, AES-128-CBC + HMAC) des colonnes sensibles."""
-
-    def __init__(self, key: str) -> None:
-        self._f = Fernet(key.encode())
-
-    def enc(self, text: str) -> str:
-        return self._f.encrypt(text.encode()).decode()
-
-    def dec(self, token: str) -> str:
-        return self._f.decrypt(token.encode()).decode()
 
 
 class RateLimiter:

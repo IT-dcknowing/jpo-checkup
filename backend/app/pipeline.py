@@ -1,23 +1,22 @@
-"""Orchestration d'un dépôt : lecture → IA → calcul → rapport → envoi (reprenable à chaque étape)."""
+"""Orchestration d'un dépôt : lecture (Supabase Storage) → IA → calcul → rapport (Storage) → envoi (Edge Function).
+Reprenable à chaque étape : le résultat de l'IA est enregistré dès qu'il existe."""
 from __future__ import annotations
 
-import json
 import logging
 import re
-import shutil
-import threading
-from concurrent.futures import ThreadPoolExecutor
+import tempfile
 from pathlib import Path
 
-from . import mailer, report
+from . import report
+from .comprehension import comprendre
 from .anonymize import anonymize
 from .config import Settings
-from .db import TERMINAUX, Database, loads, now_iso
-from .extraction import Extraction, LectureImpossible, extract
+from .db import TERMINAUX, Database, now_iso
+from .extraction import DocumentsNonReconnus, Extraction, LectureImpossible, extract
 from .llm import LLMClient, LLMError
 from .readers import ReaderError, read_file
 from .schemas import ND, DepotForm
-from .security import Cipher, sign_token
+from .supa import Supabase, SupabaseError
 
 log = logging.getLogger("jpo.pipeline")
 
@@ -26,7 +25,12 @@ FRONT_ETAPE = {"EN_ATTENTE": "EN_ATTENTE", "LECTURE": "LECTURE", "MAPPING_IA": "
                "ENVOYE": "ENVOYE", "TERMINE": "ENVOYE", "ERREUR": "ERREUR"}
 TYPES_FICHIERS = {"balance": "balance générale", "cr": "compte de résultat", "bilan": "bilan", "autre": "autre document"}
 MSG_PUBLIC_LECTURE = "Rapport automatique annulé : vos documents n'ont pas pu être lus de façon fiable. Un conseiller DC-KNOWING vous rappelle pour réaliser votre diagnostic avec vous."
+MSG_PUBLIC_NON_RECONNU = ("Aucun montant comptable exploitable n'a été trouvé dans vos fichiers (ventes, achats, salaires, comptes). "
+                          "Déposez de préférence votre balance générale, ou un journal de ventes, d'achats ou de paie ; "
+                          "un conseiller DC-KNOWING peut aussi vous rappeler pour le faire avec vous.")
 MSG_PUBLIC_TECH = "Votre diagnostic n'a pas pu être produit automatiquement. Un conseiller DC-KNOWING vous rappelle très vite."
+DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+EXT_LECTURE = {".csv", ".xlsx", ".pdf"}
 
 
 def clean_name(s: str) -> str:
@@ -63,90 +67,115 @@ def fr_conf(x: float) -> str:
 
 
 class Pipeline:
-    def __init__(self, settings: Settings, db: Database, cipher: Cipher, llm: LLMClient) -> None:
-        self.s, self.db, self.cipher, self.llm = settings, db, cipher, llm
+    def __init__(self, settings: Settings, db: Database, sb: Supabase, llm: LLMClient) -> None:
+        self.s, self.db, self.sb, self.llm = settings, db, sb, llm
 
     # ------------------------------------------------------------------ utilitaires
     def _log(self, job_id: str, statut: str, pct: int, message: str, niveau: str = "", etape: str | None = None) -> None:
-        """Change d'étape et ajoute un événement au journal, relu par le flux SSE du front."""
-        self.db.log_event(job_id, statut, pct, {"etape": etape or FRONT_ETAPE[statut], "progression": pct, "message": message, "niveau": niveau})
+        """Change d'étape et ajoute un événement au journal, relu par l'écran de suivi du front."""
+        self.db.log_event(job_id, statut, pct, {"etape": etape or FRONT_ETAPE[statut], "progression": pct, "message": message, "niveau": niveau,
+                                                 "t": now_iso()})
 
     def _purge_uploads(self, job_id: str) -> None:
-        shutil.rmtree(self.s.uploads_dir / job_id, ignore_errors=True)
-
-    def download_token(self, job_id: str) -> str:
-        return sign_token(self.s.secret_key, "dl", job_id, self.s.download_ttl)
-
-    def download_link(self, job: dict) -> str:
-        kind = "pdf" if job.get("pdf_path") else "docx"
-        return f"{self.s.public_base_url}/api/fichiers/{job['id']}/{kind}?token={self.download_token(job['id'])}"
+        """Les fichiers bruts ne servent plus après l'analyse : supprimés du stockage (la ligne documents reste comme trace)."""
+        try:
+            self.sb.remove("documents", [d["chemin"] for d in self.db.job_documents(job_id)])
+        except SupabaseError:
+            log.exception("job %s : suppression des fichiers bruts en échec (purge quotidienne en filet)", job_id)
 
     # ------------------------------------------------------------------ point d'entrée
-    def process(self, job_id: str) -> None:
+    def process(self, job_id: str, user_token: str | None = None) -> None:
+        """Traite un dépôt. `user_token` : jeton du visiteur, transmis à l'Edge Function d'envoi (contrôle de propriété)."""
         job = self.db.get_job(job_id)
         if not job or job["statut"] in TERMINAUX:
             return
-        form = DepotForm.model_validate_json(self.cipher.dec(job["form_enc"]))
+        form = DepotForm.model_validate(job["form"])
         try:
-            self._run(job, form)
+            self._run(job, form, user_token)
+        except DocumentsNonReconnus as e:
+            self._fail(job, f"documents non reconnus : {e}", MSG_PUBLIC_NON_RECONNU, user_token, motif="non_reconnu")
         except LectureImpossible as e:
-            self._fail(job, form, str(e), MSG_PUBLIC_LECTURE)
+            self._fail(job, str(e), MSG_PUBLIC_LECTURE, user_token, motif="illisible")
         except ReaderError as e:
-            self._fail(job, form, f"fichier illisible : {e}", MSG_PUBLIC_LECTURE)
+            self._fail(job, f"fichier illisible : {e}", MSG_PUBLIC_LECTURE, user_token)
         except LLMError as e:
             log.error("job %s : IA indisponible : %s", job_id, e)
-            self._fail(job, form, f"IA : {e}", MSG_PUBLIC_TECH)
+            self._fail(job, f"IA : {e}", MSG_PUBLIC_TECH, user_token)
         except report.RenderError as e:
             log.error("job %s : rendu : %s", job_id, e)
-            self._fail(job, form, f"rendu : {e}", MSG_PUBLIC_TECH)
+            self._fail(job, f"rendu : {e}", MSG_PUBLIC_TECH, user_token)
         except Exception as e:  # noqa: BLE001 — jamais de job bloqué : on journalise et on marque l'erreur
             log.exception("job %s : erreur inattendue", job_id)
-            self._fail(job, form, f"{type(e).__name__}: {e}", MSG_PUBLIC_TECH)
+            self._fail(job, f"{type(e).__name__}: {e}", MSG_PUBLIC_TECH, user_token)
+        finally:
+            try:
+                self.db.release(job_id)
+            except Exception:  # noqa: BLE001
+                log.exception("job %s : verrou non libéré", job_id)
 
-    def _fail(self, job: dict, form: DepotForm, detail: str, public: str) -> None:
+    def _fail(self, job: dict, detail: str, public: str, user_token: str | None, motif: str = "technique") -> None:
         pct = (self.db.get_job(job["id"]) or job)["progression"]
         self.db.update_job(job["id"], erreur=detail[:1500], erreur_publique=public, completed_at=now_iso())
         self._log(job["id"], "ERREUR", pct, public, "erreur")
-        if mailer.configured(self.s):
-            try:
-                mailer.send_apology(self.s, form.contact_email, job["ref"])
-            except Exception:  # noqa: BLE001
-                log.exception("job %s : e-mail d'excuse non envoyé", job["id"])
+        try:  # e-mail d'excuse (le conseiller est en copie)
+            self.sb.invoke("envoyer-rapport", {"rapport_id": job["id"], "type": "excuse", "motif": motif}, user_token)
+        except Exception:  # noqa: BLE001
+            log.exception("job %s : e-mail d'excuse non envoyé", job["id"])
 
     # ------------------------------------------------------------------ étapes
     def _extraction(self, job: dict, form: DepotForm) -> dict:
         job_id = job["id"]
-        if job["resultat_ia_json"]:  # reprise : lecture et IA déjà faites
-            return json.loads(job["resultat_ia_json"])
-        fichiers = loads(job["fichiers_json"], [])
+        if job["resultat_ia"]:  # reprise : lecture et IA déjà faites
+            return job["resultat_ia"]
+        fichiers = self.db.job_documents(job_id)
         self._log(job_id, "LECTURE", 3, f"Fichiers reçus : {len(fichiers)} document{'s' if len(fichiers) > 1 else ''}")
         textes, avertissements, genres = [], [], []
-        for i, f in enumerate(fichiers):
-            path = Path(f["path"])
-            if not path.exists():
-                raise ReaderError(f"fichier « {f['nom']} » introuvable (supprimé après 24 h)")
-            try:
-                r = read_file(path)
-            except ReaderError as e:
-                raise ReaderError(f"« {f['nom']} » : {e}") from e
-            avertissements += [f"{f['nom']} : {w}" for w in r.warnings]
-            genres.append(r.kind.upper())
-            nature = TYPES_FICHIERS.get(f.get("type", ""), "document")
-            textes.append(f"=== FICHIER {i + 1} ({r.kind.upper()} · {nature}) ===\n{anonymize(r.text, form)}")
+        locaux: list[tuple[str, Path]] = []
+        with tempfile.TemporaryDirectory(prefix="jpo-") as tmp:
+            for i, f in enumerate(fichiers):
+                ext = Path(f["nom_fichier"]).suffix.lower()
+                if ext not in EXT_LECTURE:
+                    raise ReaderError(f"« {f['nom_fichier']} » : format non lu automatiquement (CSV, XLSX ou PDF)")
+                try:
+                    data = self.sb.download("documents", f["chemin"])
+                except SupabaseError as e:
+                    raise ReaderError(f"fichier « {f['nom_fichier']} » introuvable (supprimé après 24 h)") from e
+                path = Path(tmp) / f"{i}{ext}"
+                path.write_bytes(data)
+                locaux.append((f["nom_fichier"], path))
+                try:
+                    r = read_file(path)
+                except ReaderError as e:
+                    raise ReaderError(f"« {f['nom_fichier']} » : {e}") from e
+                avertissements += [f"{f['nom_fichier']} : {w}" for w in r.warnings]
+                genres.append(r.kind.upper())
+                nature = TYPES_FICHIERS.get(f.get("categorie", ""), "document")
+                textes.append(f"=== FICHIER {i + 1} ({r.kind.upper()} · {nature}) ===\n{anonymize(r.text, form)}")
+            comp = comprendre(locaux, form.tva_exoneree)  # type de chaque tableau et totaux exacts
+        comp.documents = [anonymize(d, form) for d in comp.documents]  # noms de fichiers : peuvent contenir la raison sociale
+        comp.avertissements = [anonymize(a, form) for a in comp.avertissements]
+        for fait in comp.faits.values():
+            fait.source = anonymize(fait.source, form)
         self._log(job_id, "LECTURE", 17, f"Texte extrait ({', '.join(genres)})")
+        if comp.documents:
+            types = sorted({d.split(" : ", 1)[1].split(" (")[0] for d in comp.documents})
+            self._log(job_id, "LECTURE", 20, f"Documents reconnus : {', '.join(types)}")
+        if comp.faits:
+            self._log(job_id, "LECTURE", 22, f"Totaux calculés sur vos fichiers : {len(comp.faits)} poste{'s' if len(comp.faits) > 1 else ''}")
         self._log(job_id, "MAPPING_IA", 24, "Anonymisation : noms, NCC, RIB et téléphones remplacés")
-        ext: Extraction = extract(self.llm, form, "\n\n".join(textes), self.s.context_max_chars)
-        ext.ia["meta"]["warnings"] += avertissements
-        self._log(job_id, "MAPPING_IA", 40, f"Extraction IA : confiance globale {fr_conf(ext.confiance_globale)}")
-        self._log(job_id, "MAPPING_IA", 43, f"Contrôles de cohérence terminés · données exploitées {ext.couverture_pct} %")
-        saved = {"ia": ext.ia, "couverture_pct": ext.couverture_pct, "confiance": ext.confiance_globale,
-                 "partielle": ext.lecture_partielle, "modele": ext.modele}
-        self.db.update_job(job_id, resultat_ia_json=json.dumps(saved, ensure_ascii=False),
-                           lecture_partielle=int(ext.lecture_partielle), modele_ia=ext.modele)
-        self._purge_uploads(job_id)  # les fichiers bruts ne servent plus
+        ext_: Extraction = extract(self.llm, form, "\n\n".join(textes), self.s.context_max_chars, comp)
+        ext_.ia["meta"]["warnings"] += avertissements
+        self._log(job_id, "MAPPING_IA", 40, f"Extraction IA : confiance globale {fr_conf(ext_.confiance_globale)}")
+        self._log(job_id, "MAPPING_IA", 43, f"Contrôles de cohérence terminés · données exploitées {ext_.couverture_pct} %")
+        if ext_.couverture_pct < 60:
+            self._log(job_id, "MAPPING_IA", 45, "Documents partiels : le rapport porte sur les parties disponibles (note indicative)")
+        saved = {"ia": ext_.ia, "couverture_pct": ext_.couverture_pct, "confiance": ext_.confiance_globale,
+                 "partielle": ext_.lecture_partielle, "modele": ext_.modele}
+        self.db.update_job(job_id, resultat_ia=saved, lecture_partielle=bool(ext_.lecture_partielle), modele_ia=ext_.modele)
+        self._purge_uploads(job_id)
         return saved
 
-    def _run(self, job: dict, form: DepotForm) -> None:
+    def _run(self, job: dict, form: DepotForm, user_token: str | None) -> None:
         job_id, ref = job["id"], job["ref"]
         saved = self._extraction(job, form)
 
@@ -155,80 +184,37 @@ class Pipeline:
         faits = report.compute(self.s, data)
         self.db.update_job(job_id, score_performance=faits["score_performance"], grade_performance=faits["grade_performance"],
                            score_conformite=faits["score_conformite"], grade_conformite=faits["grade_conformite"],
-                           couverture_pct=faits["couverture_pct"], alertes_json=json.dumps(faits["alertes"], ensure_ascii=False),
-                           resume_json=json.dumps(faits["resume"], ensure_ascii=False))
+                           couverture_pct=faits["couverture_pct"], alertes=faits["alertes"], resume=faits["resume"])
         self._log(job_id, "CALCUL", 58, f"Performance {faits['score_performance']}/100 ({faits['grade_performance']}) · "
                                        f"Conformité {faits['score_conformite']}/100 ({faits['grade_conformite']})")
 
         self._log(job_id, "RAPPORT", 72, "Rapport rédigé en langage simple", etape="INTERPRETATION")
-        res = report.build_report(self.s, data, self.s.reports_dir / job_id, f"Diagnostic_DC-KNOWING_{ref}")
+        with tempfile.TemporaryDirectory(prefix="jpo-rapport-") as tmp:
+            res = report.build_report(self.s, data, Path(tmp), f"Diagnostic_DC-KNOWING_{ref}")
+            base = f"{job['owner']}/{job_id}"
+            self.sb.upload("rapports", f"{base}.docx", res.docx.read_bytes(), DOCX_MIME)
+            self.sb.upload("rapports", f"{base}.md", res.md.read_bytes(), "text/markdown")
         plan = res.resume.get("plan", [])
-        self.db.update_job(job_id, docx_path=str(res.docx), md_path=str(res.md), pdf_path=str(res.pdf) if res.pdf else None,
-                           pages=res.pages, plan_action_json=json.dumps(plan, ensure_ascii=False))
+        self.db.update_job(job_id, docx_path=f"{base}.docx", md_path=f"{base}.md", pages=res.pages, plan_action=plan)
         self._log(job_id, "RAPPORT", 80, f"Plan d'action : {len(plan)} action{'s' if len(plan) > 1 else ''} priorisée{'s' if len(plan) > 1 else ''}")
-        self._log(job_id, "RAPPORT", 85, f"Rapport généré : {res.pages} pages" if res.pages else "Rapport Word généré")
-        note = None
-        if res.pages is not None and res.pages > 4:
-            note = f"rapport de {res.pages} pages même en mode compact : à raccourcir à la main"
-        elif res.pages is None:
-            note = "nombre de pages non contrôlé (LibreOffice absent)"
-        elif not res.pdf:
-            note = "PDF non généré"
+        self._log(job_id, "RAPPORT", 88, "Rapport Word généré · envoi de l'e-mail")
+        self.db.update_job(job_id, completed_at=now_iso())
 
-        job = self.db.get_job(job_id) or job
-        if not mailer.configured(self.s):
-            self.db.update_job(job_id, completed_at=now_iso(),
-                               erreur="; ".join(x for x in (note, "e-mail non envoyé : SMTP non configuré") if x))
-            self._log(job_id, "TERMINE", 100, "Rapport prêt · disponible dans Mes diagnostics", "ok")
-            return
-        try:
-            mailer.send_report(self.s, form.contact_email, form.contact_nom, faits, faits["resume"]["verdict"], res.docx, res.pdf, self.download_link(job))
+        try:  # l'Edge Function vérifie la propriété, signe un lien de 7 jours, envoie l'e-mail et passe le statut à « envoye »
+            self.sb.invoke("envoyer-rapport", {"rapport_id": job_id}, user_token)
         except Exception as e:  # noqa: BLE001 — le rapport existe : on ne perd pas le travail
             log.exception("job %s : envoi e-mail en échec", job_id)
-            self.db.update_job(job_id, completed_at=now_iso(), erreur=f"e-mail non envoyé : {type(e).__name__}")
+            self.db.update_job(job_id, erreur=f"e-mail non envoyé : {str(e)[:300]}")
             self._log(job_id, "TERMINE", 100, "Rapport prêt · disponible dans Mes diagnostics", "ok")
+            self.sb.update("rapports", {"id": f"eq.{job_id}"}, {"statut": "erreur"})  # rapport généré, envoi en échec
             return
-        self.db.update_job(job_id, email_envoye_at=now_iso(), completed_at=now_iso(), erreur=note)
         self._log(job_id, "ENVOYE", 100, "E-mail envoyé · ajouté à Mes diagnostics", "ok")
 
     def resend(self, job_id: str) -> None:
-        """Renvoie l'e-mail du rapport (action conseiller). Lève ValueError si impossible."""
+        """Renvoie l'e-mail du rapport (action conseiller, avec la clé service_role). Lève ValueError si impossible."""
         job = self.db.get_job(job_id)
-        if not job or not job["docx_path"] or not Path(job["docx_path"]).exists():
+        if not job or not job["docx_path"]:
             raise ValueError("Le rapport n'existe plus : relancez le traitement.")
-        if not mailer.configured(self.s):
-            raise ValueError("L'envoi d'e-mails n'est pas configuré (SMTP).")
-        form = DepotForm.model_validate_json(self.cipher.dec(job["form_enc"]))
-        faits = {"score_performance": job["score_performance"], "grade_performance": job["grade_performance"],
-                 "score_conformite": job["score_conformite"], "grade_conformite": job["grade_conformite"]}
-        verdict = (loads(job["resume_json"], {}) or {}).get("verdict", "")
-        pdf = Path(job["pdf_path"]) if job["pdf_path"] else None
-        mailer.send_report(self.s, form.contact_email, form.contact_nom, faits, verdict, Path(job["docx_path"]), pdf, self.download_link(job))
-        self.db.update_job(job_id, email_envoye_at=now_iso(), statut="ENVOYE")
-
-
-class JobRunner:
-    """File d'attente en mémoire : N workers (threads). Les dépôts inachevés sont relancés au démarrage."""
-
-    def __init__(self, pipeline: Pipeline, workers: int) -> None:
-        self.pipeline = pipeline
-        self.pool = ThreadPoolExecutor(max_workers=max(workers, 1), thread_name_prefix="jpo-worker")
-        self._inflight: set[str] = set()
-        self._lock = threading.Lock()
-
-    def submit(self, job_id: str) -> None:
-        with self._lock:  # un même dépôt n'est jamais traité deux fois en parallèle
-            if job_id in self._inflight:
-                return
-            self._inflight.add(job_id)
-        self.pool.submit(self._run, job_id)
-
-    def _run(self, job_id: str) -> None:
-        try:
-            self.pipeline.process(job_id)
-        finally:
-            with self._lock:
-                self._inflight.discard(job_id)
-
-    def shutdown(self) -> None:
-        self.pool.shutdown(wait=False, cancel_futures=True)
+        self.sb.invoke("envoyer-rapport", {"rapport_id": job_id})
+        if job["statut"] != "ENVOYE":
+            self._log(job_id, "ENVOYE", 100, "E-mail renvoyé par un conseiller", "ok")

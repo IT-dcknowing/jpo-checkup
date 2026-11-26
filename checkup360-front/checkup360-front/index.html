@@ -47,7 +47,7 @@
 <p style="font-family: Poppins, sans-serif; font-style: italic; font-size: 17px">Le cabinet DC-KNOWING vous invite aux</p>
 <div class="lockup" aria-hidden="true" style="margin-top: 6px"><span class="script" style="font-size: clamp(4.5rem, 9vw, 7.5rem); margin-bottom: -0.36em; margin-left: 1.2em; position: relative; z-index: 1; width: 447px; height: 153px">Journées</span><span class="wm" style="font-size: clamp(2.6rem, 5.6vw, 4.5rem)">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 62%; height: auto; display: block; margin-top: 6px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></div>
 <h1 id="h-hero" style="font-size: clamp(1.6rem, 2.8vw, 2.2rem); line-height: 1.15; margin-top: 22px; font-family: Poppins, Sora, sans-serif; font-weight: 800">Votre diagnostic Check-up 360 en 10 minutes</h1>
-<p style="font-size: 18px; color: #525252; max-width: 56ch; margin-top: 12px; line-height: 1.55">Déposez vos documents comptables et recevez par e-mail un rapport PDF de 3 pages : santé financière, conformité fiscale et sociale, plan d’action priorisé et orientation à 12 mois.</p>
+<p style="font-size: 18px; color: #525252; max-width: 56ch; margin-top: 12px; line-height: 1.55">Déposez vos documents comptables et recevez par e-mail un rapport Word de 4 pages : santé financière, conformité fiscale et sociale, plan d’action priorisé et orientation à 12 mois.</p>
 <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px">
 <button type="button" class="btn btn-a btn-lg" onClick="{{start}}">Faire mon diagnostic<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
 <a class="btn btn-g btn-lg" href="#etapes">Comment ça marche ?</a>
@@ -95,7 +95,7 @@
 <article class="card lift up d3" style="padding: 24px; display: flex; flex-direction: column; gap: 10px">
 <span class="m" style="width: 44px; height: 44px; display: grid; place-items: center; background: #000000; color: #FFD700; border-radius: 12px; font-weight: 700; font-size: 18px">03</span>
 <h3 style="font-size: 18px">Recevez votre rapport</h3>
-<p class="muted" style="font-size: 14px">PDF de 3 pages par e-mail et dans « Mes diagnostics », puis entretien individuel avec un conseiller.</p>
+<p class="muted" style="font-size: 14px">Rapport Word de 4 pages par e-mail et dans « Mes diagnostics », puis entretien individuel avec un conseiller.</p>
 </article>
 </div>
 </section>
@@ -317,21 +317,21 @@
 <sc-if value="{{show.s5}}" hint-placeholder-val="{{false}}">
 <div class="up" style="display: flex; flex-direction: column; gap: 14px">
 <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
-<span class="bdg {{fileCountCls}}">{{fileCount}} / 3 fichiers</span>
+<span class="bdg {{fileCountCls}}">{{fileCount}} / 10 fichiers</span>
 <sc-if value="{{showSampleFiles}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-t btn-sm" onClick="{{sampleFiles}}">Utiliser des fichiers d’exemple</button></sc-if>
 </div>
 <sc-for list="{{docSlots}}" as="d" hint-placeholder-count="4">
 <div>
 <sc-if value="{{d.isEmpty}}" hint-placeholder-val="{{true}}">
 <label class="slot {{d.over}}" onDragOver="{{d.dragOver}}" onDragEnter="{{d.dragOver}}" onDragLeave="{{d.dragLeave}}" onDrop="{{d.drop}}">
-<input class="vh" type="file" accept=".csv,.xlsx,.pdf" onChange="{{d.pick}}" aria-label="{{d.aria}}">
+<input class="vh" type="file" accept=".csv,.xlsx,.pdf" multiple onChange="{{d.pick}}" aria-label="{{d.aria}}">
 <span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"></path></svg></span>
 <span style="flex: 1; min-width: 0"><span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><b style="font-size: 15px">{{d.l}}</b><sc-if value="{{d.rec}}" hint-placeholder-val="{{false}}"><span class="bdg b-acc" style="padding: 1px 8px">Recommandé</span></sc-if></span><span class="hint" style="display: block">{{d.d}}</span></span>
 <span class="btn btn-g btn-sm" aria-hidden="true">Choisir</span>
 </label>
 </sc-if>
 <sc-if value="{{d.isOff}}" hint-placeholder-val="{{false}}">
-<div class="slot off"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"></path></svg></span><span style="flex: 1"><b style="font-size: 15px">{{d.l}}</b><span class="hint" style="display: block">Maximum de 3 fichiers atteint.</span></span></div>
+<div class="slot off"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"></path></svg></span><span style="flex: 1"><b style="font-size: 15px">{{d.l}}</b><span class="hint" style="display: block">Maximum de 10 fichiers atteint.</span></span></div>
 </sc-if>
 <sc-if value="{{d.isFilled}}" hint-placeholder-val="{{false}}">
 <div class="slot filled">
@@ -344,6 +344,7 @@
 </div>
 </sc-for>
 <sc-if value="{{err.files}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.files}}</span></sc-if>
+<p class="hint"><b>Idéal : la balance générale</b> (ou le compte de résultat et le bilan). Journaux de ventes, d’achats ou de paie et grand livre sont aussi acceptés : le diagnostic porte alors sur les parties qu’ils couvrent.</p>
 <p class="hint">CSV ou XLSX exportés de votre logiciel : lecture la plus rapide. PDF natif ou numérisé accepté. 20 Mo maximum par fichier.</p>
 </div>
 </sc-if>
@@ -445,7 +446,7 @@
 
 <sc-if value="{{failed}}" hint-placeholder-val="{{false}}">
 <div class="up" style="padding: 18px; border-radius: 16px; background: #FEE2E2; border: 1px solid #F6C7C7; display: flex; flex-direction: column; gap: 12px">
-<p style="font-size: 14px"><b>Vos documents n’ont pas pu être lus de façon fiable</b> (confiance de lecture 0,24, seuil 0,30). Aucun rapport automatique n’est produit pour éviter des chiffres erronés. Un e-mail vous a été envoyé et un conseiller vous rappelle au <b class="m">{{telShown}}</b>.</p>
+<p style="font-size: 14px"><b>Aucun rapport automatique.</b> {{failMsg}} Un e-mail vous a été envoyé et un conseiller vous rappelle au <b class="m">{{telShown}}</b>.</p>
 <div style="display: flex; gap: 10px; flex-wrap: wrap">
 <button type="button" class="btn btn-p" onClick="{{retryFiles}}">Déposer d’autres fichiers</button>
 <button type="button" class="btn btn-g" onClick="{{callMe}}">Être rappelé maintenant</button>
@@ -536,7 +537,7 @@
 
 <section style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
 <button type="button" class="btn btn-a btn-lg {{dlCls}}" onClick="{{openReport}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>Voir le rapport</button>
-<button type="button" class="btn btn-g btn-lg" onClick="{{download}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"></path></svg>Télécharger le PDF</button>
+<button type="button" class="btn btn-g btn-lg" onClick="{{download}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"></path></svg>Télécharger le rapport</button>
 <button type="button" class="btn btn-p btn-lg" onClick="{{openSlot}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16"></path></svg>{{slotBtn}}</button>
 <button type="button" class="btn btn-g btn-lg" onClick="{{openEspace}}" style="margin-left: auto"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Mes diagnostics</button>
 </section>
@@ -576,7 +577,7 @@
 <sc-if value="{{x.failed}}" hint-placeholder-val="{{false}}"><p style="font-size: 13px; margin-top: 4px; color: #DC2626">Documents illisibles : un conseiller vous rappelle.</p></sc-if>
 </div>
 <div style="display: flex; gap: 8px; flex-wrap: wrap">
-<sc-if value="{{x.done}}" hint-placeholder-val="{{true}}"><button type="button" class="btn btn-p btn-sm {{x.openCls}}" onClick="{{x.open}}">Ouvrir</button><button type="button" class="btn btn-g btn-sm" onClick="{{x.download}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"></path></svg>PDF</button></sc-if>
+<sc-if value="{{x.done}}" hint-placeholder-val="{{true}}"><button type="button" class="btn btn-p btn-sm {{x.openCls}}" onClick="{{x.open}}">Ouvrir</button><button type="button" class="btn btn-g btn-sm" onClick="{{x.download}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"></path></svg>Rapport</button></sc-if>
 <sc-if value="{{x.running}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-g btn-sm" onClick="{{x.follow}}">Suivre en direct</button></sc-if>
 <sc-if value="{{x.failed}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-g btn-sm" onClick="{{start}}">Redéposer</button></sc-if>
 </div>
@@ -789,6 +790,7 @@
 <script src="config.js"></script>
 <script src="assets/js/vendor/preact.min.js"></script>
 <script src="assets/js/dc-runtime.js"></script>
+<script src="assets/js/vendor/supabase.js"></script>
 <script src="assets/js/api.js"></script>
 <script src="assets/js/app-visiteur.js"></script>
 <script>DC.mount(Component, 'tpl-visiteur', document.getElementById('app'), DC.queryProps());</script>

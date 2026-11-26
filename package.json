@@ -1,0 +1,10 @@
+{
+  "name": "jpo-checkup",
+  "private": true,
+  "description": "Check-up 360 — Journées Portes Ouvertes DC-KNOWING (front statique + API Vercel + Supabase)",
+  "engines": { "node": "22.x" },
+  "dependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "docx": "9.8.1"
+  }
+}

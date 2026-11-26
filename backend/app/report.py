@@ -71,7 +71,7 @@ def compute(settings: Settings, data: dict) -> dict:
         grade_conformite=conf["grade"], couverture_pct=round(ok / len(champs) * 100),
         points_evaluables=perf["couverture"], score_indicatif=perf["indicatif"],
         alertes=alertes, risque_redressement=conf["risque_redressement"],
-        resume=dict(verdict=VERDICT[perf["grade"]], points_forts=list(dict.fromkeys(forts))[:4],
+        resume=dict(verdict=("Note indicative (documents partiels) : " if perf["indicatif"] else "") + VERDICT[perf["grade"]], points_forts=list(dict.fromkeys(forts))[:4],
                     points_a_traiter=list(dict.fromkeys(a_traiter))[:5], alerte_principale=principale.split(" : ")[0].rstrip("."),
                     indicatif=perf["indicatif"]),
     )
@@ -87,11 +87,29 @@ def _strip_dir_entries(docx: Path) -> None:
     tmp.replace(docx)
 
 
+def _render_docx_http(settings: Settings, md: Path, docx: Path) -> None:
+    """Rendu par la fonction Node déployée à côté (Vercel : /api/docx), protégée par un secret partagé."""
+    import httpx
+
+    try:
+        r = httpx.post(settings.docx_render_url, content=md.read_bytes(), timeout=settings.render_timeout,
+                       headers={"Content-Type": "text/markdown; charset=utf-8", "X-Render-Secret": settings.secret_key,
+                                **({"x-vercel-protection-bypass": settings.vercel_bypass} if settings.vercel_bypass else {})})
+    except httpx.HTTPError as e:
+        raise RenderError(f"service de rendu Word injoignable ({type(e).__name__})") from e
+    if r.status_code != 200 or not r.content.startswith(b"PK"):
+        raise RenderError(f"rendu Word en échec (HTTP {r.status_code}) : {r.text[:300]}")
+    docx.write_bytes(r.content)
+    _strip_dir_entries(docx)
+
+
 def _render_docx(settings: Settings, md: Path, docx: Path) -> None:
+    if settings.docx_render_url:
+        return _render_docx_http(settings, md, docx)
     if not settings.node_path:
         raise RenderError("Node.js introuvable (installer Node 20 ou plus)")
-    if not (settings.word_dir / "node_modules").exists():
-        raise RenderError("dépendances Node absentes : lancer « npm install » dans le dossier word/")
+    if not any((d / "node_modules" / "docx").exists() for d in (settings.word_dir, settings.project_dir)):
+        raise RenderError("dépendances Node absentes : lancer « npm install » à la racine du projet")
     r = subprocess.run([settings.node_path, str(settings.word_dir / "md_vers_word.js"), str(md), str(docx)],
                        capture_output=True, text=True, timeout=settings.render_timeout, cwd=str(settings.word_dir))
     if r.returncode != 0 or not docx.exists():

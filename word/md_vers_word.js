@@ -39,6 +39,8 @@ const PAGE_W = 11906, MARGE = 1080, LARGEUR = PAGE_W - 2 * MARGE; // 9746 DXA
 const ICI = __dirname;
 // Polices des graphiques : Liberation Sans (Linux) ou Arial (Windows / macOS), la première trouvée.
 const FONT_SETS = [
+  // Polices fournies avec le projet (word/fonts, licence SIL OFL) : indispensables sur un serveur sans polices (Vercel)
+  { family: "Liberation Sans", files: [path.join(__dirname, "fonts", "LiberationSans-Regular.ttf"), path.join(__dirname, "fonts", "LiberationSans-Bold.ttf")] },
   { family: "Liberation Sans", files: ["/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"] },
   { family: "Arial", files: [`${process.env.WINDIR || "C:\\Windows"}\\Fonts\\arial.ttf`, `${process.env.WINDIR || "C:\\Windows"}\\Fonts\\arialbd.ttf`] },
   { family: "Arial", files: ["/Library/Fonts/Arial.ttf", "/Library/Fonts/Arial Bold.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"] },
@@ -292,8 +294,9 @@ function lire(md) {
 }
 
 // ------------------------------------------------------------------ document
-async function main(src, dst) {
-  const { meta, out } = lire(fs.readFileSync(src, "utf8"));
+/** Markdown balisé (texte) → document Word (Buffer). Utilisé par la CLI et par la fonction Vercel api/docx.js. */
+async function convertir(markdown) {
+  const { meta, out } = lire(markdown);
   const logo = fs.readFileSync(path.join(ICI, "logo.png"));
   const header = new Header({ children: [
     new Paragraph({
@@ -322,7 +325,13 @@ async function main(src, dst) {
       headers: { default: header }, footers: { default: footer }, children: out,
     }],
   });
-  fs.writeFileSync(dst, await Packer.toBuffer(doc));
+  return Packer.toBuffer(doc);
+}
+
+async function main(src, dst) {
+  fs.writeFileSync(dst, await convertir(fs.readFileSync(src, "utf8")));
   console.log("OK", dst);
 }
-main(process.argv[2], process.argv[3]).catch((e) => { console.error(e); process.exit(1); });
+
+module.exports = { convertir };
+if (require.main === module) main(process.argv[2], process.argv[3]).catch((e) => { console.error(e); process.exit(1); });

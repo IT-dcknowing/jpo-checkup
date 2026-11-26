@@ -7,12 +7,12 @@ import shutil
 from functools import lru_cache
 from pathlib import Path
 
-from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 PROJECT_DIR = BACKEND_DIR.parent
 WORD_DIR = PROJECT_DIR / "word"
+load_dotenv(PROJECT_DIR / ".env")
 load_dotenv(BACKEND_DIR / ".env")
 
 # Ordre de repli : si le premier modèle échoue, on passe au suivant.
@@ -78,7 +78,23 @@ def _find_soffice() -> str | None:
 class Settings:
     def __init__(self) -> None:
         e = os.getenv
-        self.data_dir = Path(e("DATA_DIR") or BACKEND_DIR / "data").resolve()
+        # Sur Vercel, seul /tmp est inscriptible (fichiers temporaires uniquement : tout le reste est dans Supabase)
+        default_data = Path("/tmp/jpo-data") if e("VERCEL") else BACKEND_DIR / "data"
+        self.data_dir = Path(e("DATA_DIR") or default_data).resolve()
+
+        # Supabase : base, stockage, comptes. La clé service_role ne sert que côté serveur.
+        self.supabase_url = e("SUPABASE_URL", "").strip().rstrip("/")
+        self.supabase_anon_key = (e("SUPABASE_PUBLISHABLE_KEY") or e("SUPABASE_ANON_KEY") or "").strip()
+        self.supabase_service_key = (e("SUPABASE_SERVICE_ROLE_KEY") or e("SUPABASE_SECRET_KEY") or "").strip()
+        # Rendu Word par la fonction Node (Vercel) ; vide = Node local (node word/md_vers_word.js)
+        self.docx_render_url = e("DOCX_RENDER_URL", "").strip()
+        if not self.docx_render_url and e("VERCEL"):
+            # Production : domaine du projet ; préversions : URL du déploiement (contournement de protection si fourni)
+            host = e("VERCEL_PROJECT_PRODUCTION_URL") if e("VERCEL_ENV") == "production" else e("VERCEL_URL")
+            if host:
+                self.docx_render_url = f"https://{host}/api/docx"
+        self.vercel_bypass = e("VERCEL_AUTOMATION_BYPASS_SECRET", "").strip()
+        self.cron_secret = e("CRON_SECRET", "").strip()
         self.uploads_dir = self.data_dir / "uploads"
         self.reports_dir = self.data_dir / "reports"
         self.db_path = self.data_dir / "diagnostics.sqlite3"
@@ -90,6 +106,8 @@ class Settings:
         self.openrouter_url = e("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions")
         self.llm_models = _csv("OPENROUTER_MODELS", DEFAULT_MODELS)
         self.llm_timeout = _float("LLM_TIMEOUT", 120)
+        # Budget total de l'étape IA (s) : la fonction Vercel s'arrête à 300 s, on garde de la marge pour le rendu
+        self.llm_budget = _float("LLM_BUDGET", 0)
         self.llm_backoff = [float(x) for x in _csv("LLM_BACKOFF", ["2", "6", "18"])]
         self.llm_max_tokens = _int("LLM_MAX_TOKENS", 8000)
         # Les modèles gratuits exigent d'accepter la collecte ; le texte envoyé est anonymisé.
@@ -98,7 +116,7 @@ class Settings:
 
         # Dépôts
         self.max_upload_bytes = _int("MAX_UPLOAD_MB", 20) * 1024 * 1024
-        self.max_files = _int("MAX_FILES", 3)
+        self.max_files = _int("MAX_FILES", 10)
         self.rate_limit = _int("RATE_LIMIT_PER_HOUR", 5)
         self.event_days = _csv("EVENT_DAYS", DEFAULT_EVENT_DAYS)
         self.workers = _int("WORKERS", 4)
@@ -121,8 +139,8 @@ class Settings:
         self.event_location = e("EVENT_LOCATION", "Siège du Cabinet DC KNOWING, Cocody Riviera 2, Collège André Malraux, Abidjan")
 
         # Sécurité
+        # SECRET_KEY : signe les jetons conseillers et protège le service de rendu Word (obligatoire en production)
         self.secret_key = e("SECRET_KEY", "").strip() or _persisted(self.data_dir / ".secret_key", lambda: secrets.token_urlsafe(48))
-        self.data_key = e("DATA_KEY", "").strip() or _persisted(self.data_dir / ".data_key", lambda: Fernet.generate_key().decode())
         # Comptes conseillers : ADMIN_USER / ADMIN_PASSWORD, plus ADMIN_ACCOUNTS="a@x.ci=mdp1;b@x.ci=mdp2"
         self.admin_accounts: dict[str, str] = {}
         if e("ADMIN_PASSWORD"):
@@ -134,21 +152,15 @@ class Settings:
         self.admin_token_ttl = _int("ADMIN_TOKEN_HOURS", 10) * 3600
         self.download_ttl = _int("DOWNLOAD_TTL_DAYS", 7) * 86400
         self.cors_origins = _csv("CORS_ORIGINS", ["http://localhost:5173", "http://localhost:3000"])
-        self.trust_proxy = e("TRUST_PROXY", "0") == "1"
+        self.on_vercel = bool(e("VERCEL"))
+        self.trust_proxy = e("TRUST_PROXY", "1" if self.on_vercel else "0") == "1"  # Vercel : x-forwarded-for fiable
         self.public_base_url = e("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
 
         # Rétention
         self.retention_raw_hours = _int("RETENTION_RAW_HOURS", 24)
         self.retention_report_days = _int("RETENTION_REPORT_DAYS", 30)
 
-        # E-mail (SMTP) ; sans SMTP_HOST le rapport est produit mais pas envoyé
-        self.smtp_host = e("SMTP_HOST", "").strip()
-        self.smtp_port = _int("SMTP_PORT", 587)
-        self.smtp_user = e("SMTP_USER", "")
-        self.smtp_password = e("SMTP_PASSWORD", "")
-        self.smtp_security = e("SMTP_SECURITY", "starttls").lower()  # starttls | ssl | none
-        self.mail_from = e("MAIL_FROM", "diagnostic@dc-knowing.com")
-        self.mail_copy_to = _csv("MAIL_COPY_TO", [])
+        # E-mails : envoyés par Supabase (Auth + Edge Function envoyer-rapport, via Resend) ; aucun secret d'envoi ici
 
         # Rendu Word / PDF
         self.node_path = e("NODE_PATH_BIN", "").strip() or shutil.which("node")

@@ -122,6 +122,22 @@ def test_fallback_chain_moves_to_next_model(settings):
     assert seen.count(settings.llm_models[1]) == 2  # essai + relance avec le message d'erreur
 
 
+def test_empty_answer_moves_to_next_model_at_once(settings):
+    seen = []
+
+    def handler(req):
+        model = json.loads(req.content)["model"]
+        seen.append(model)
+        if model == settings.llm_models[0]:
+            return httpx.Response(200, json={"choices": [{"message": {"content": ""}, "finish_reason": "length"}]})
+        return ok_response(EXEMPLE["ia"])
+
+    settings.llm_budget = 170
+    _, model = mock_client(settings, handler).complete_validated("s", "u", IAOutput.model_validate)
+    assert model == settings.llm_models[1]
+    assert seen.count(settings.llm_models[0]) == 1  # pas de nouvel essai sur une réponse vide
+
+
 def test_optional_params_dropped_on_400(settings):
     bodies = []
 

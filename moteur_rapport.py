@@ -159,8 +159,11 @@ def score_performance(k):
         r = k["endet"]
         bloc("Endettement / capitaux propres", 15 if r <= 30 else 11 if r <= 50 else 6 if r <= 80 else 3 if r <= 100 else 0, 15, True, pct(r))
 
-    score = min(sum(b["pts"] for b in blocs), 100)
     couverture = sum(b["max"] for b in blocs if b["dispo"])  # points évaluables
+    total = sum(b["pts"] for b in blocs)
+    # Données partielles : un poste manquant ne doit pas compter comme un mauvais résultat.
+    # La note est ramenée sur les seuls points évaluables et signalée comme indicative.
+    score = min(round(total * 100 / couverture), 100) if 0 < couverture < 100 else min(total, 100)
     if score < 40:
         alertes.append("Performance financière très faible : risque critique.")
     elif score < 60:
