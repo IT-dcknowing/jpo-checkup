@@ -193,6 +193,7 @@ def test_purge_au_dela_de_la_limite_postgrest(client, tok):
 
 
 def test_interview_booking(client, tok):
+    client.settings.slot_capacity = 1  # un seul expert : une réservation remplit le créneau
     job_id = depot(client, tok).json()["job_id"]
     assert client.post(f"/api/diagnostics/{job_id}/entretien", json={"jour": "2026-12-16", "heure": "09:45"}, headers=auth(tok)).status_code == 409
     traiter(client, tok, job_id)
