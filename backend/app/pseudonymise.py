@@ -10,7 +10,8 @@ clients, des fournisseurs et des salariés. Ici, chaque tableau est relu colonne
   partent dans la synthèse.
 Tableaux sans en-tête reconnaissable : tout texte qui n'est ni un nombre, ni une date, ni un code court est masqué.
 
-Limite : un PDF n'a pas de colonnes ; son texte est seulement anonymisé pour le déclarant (voir notice).
+PDF : voir pseudonymiser_pdf (tableaux détectés, civilités, étiquettes, paie réduite aux totaux) ; un nom isolé dans un
+texte libre peut subsister (limite indiquée dans la notice).
 """
 from __future__ import annotations
 
@@ -107,3 +108,54 @@ def pseudonymiser_tableaux(path: Path, nom_fichier: str, pseudo: Pseudonymes) ->
             lignes.append(_ligne(out))
         blocs.append(f"--- FEUILLE « {feuille} » ---\n" + "\n".join(lignes))
     return "\n\n".join(blocs) if blocs else None
+
+
+# ------------------------------------------------------------------ PDF (texte sans colonnes)
+CIVILITE = re.compile(r"\b(M\.|Mr\.?|Mme|Mlle|Monsieur|Madame|Mademoiselle|Dr\.?|Me)\s+"
+                      r"([A-ZÀ-Ý][\w'’-]+(?:\s+[A-ZÀ-Ý][\w'’-]+){0,3})")
+ETIQUETTE = re.compile(r"(?i:\b(client|fournisseur|salari[ée]e?|employ[ée]e?|b[ée]n[ée]ficiaire|nom(?: et pr[ée]noms?)?|pr[ée]noms?|"
+                       r"tiers|agent|collaborateur|matricule))\s*[:：]\s*([A-ZÀ-Ý0-9][\w'’&.-]*(?:\s+[A-ZÀ-Ý][\w'’&.-]*){0,4})")
+TOTAL_PAIE = re.compile(r"\b(total|totaux|sous-total|cumul|masse salariale|r[ée]capitulatif)\b", re.I)
+
+
+def _remplacer(texte: str, originaux: dict[str, str]) -> str:
+    for orig in sorted(originaux, key=len, reverse=True):
+        if len(orig) >= 3:
+            texte = re.sub(rf"(?<!\w){re.escape(orig)}(?!\w)", originaux[orig], texte, flags=re.I)
+    return texte
+
+
+def pseudonymiser_pdf(path: Path, nom_fichier: str, texte: str, pseudo: Pseudonymes, max_pages: int = 80) -> str:
+    """Texte d'un PDF (déjà extrait, OCR compris) avec les tiers remplacés, au mieux :
+    1. tableaux détectés dans le PDF : colonnes d'identité relevées puis remplacées partout dans le texte ;
+    2. noms précédés d'une civilité (M., Mme, Monsieur...) ou d'une étiquette (« Client : », « Salarié : »...) ;
+    3. journal ou bulletins de paie : seules les lignes de totaux sont gardées (aucune ligne nominative).
+    Reste une limite : un nom isolé dans un texte libre, sans civilité ni étiquette, n'est pas reconnu."""
+    import pdfplumber
+
+    originaux: dict[str, str] = {}
+    paie = bool(re.search(r"paie|salaire|bulletin", _norm(nom_fichier)))
+    with pdfplumber.open(path) as pdf:
+        for page in pdf.pages[:max_pages]:
+            for tab in page.extract_tables() or []:
+                rows = [r for r in tab if r and any(c not in (None, "") for c in r)]
+                h = _entete(rows) if rows else None
+                if not h:
+                    continue
+                i, entetes = h
+                t = Table(nom_fichier, entetes, rows[i + 1:])
+                if classer(t, nom_fichier) == "paie":
+                    paie = True
+                for j, e in enumerate(entetes):
+                    if IDENTITE.search(e):
+                        for r in t.lignes:
+                            if j < len(r) and not _neutre(r[j]):
+                                originaux[str(r[j]).strip()] = pseudo(r[j])
+    if paie:
+        totaux = [ligne for ligne in texte.splitlines() if TOTAL_PAIE.search(ligne) and re.search(r"\d", ligne)]
+        texte = ("[Bulletins / journal de paie : détail nominatif non transmis ; lignes de totaux uniquement]\n"
+                 + "\n".join(totaux))
+    texte = _remplacer(texte, originaux)
+    texte = CIVILITE.sub(lambda m: f"{m.group(1)} {pseudo(m.group(2))}", texte)
+    texte = ETIQUETTE.sub(lambda m: f"{m.group(1)} : {m.group(2) if _neutre(m.group(2).strip()) else pseudo(m.group(2))}", texte)
+    return texte

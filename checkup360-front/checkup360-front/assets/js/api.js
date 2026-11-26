@@ -14,14 +14,15 @@
     del: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
   };
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-  /* Jeton conseiller : sessionStorage (effacé à la fermeture de l'onglet), jamais localStorage. */
+  /* Session conseiller : le jeton est dans un cookie HttpOnly posé par le serveur (illisible ici). On ne garde, pour
+     l'affichage, qu'un indicateur « connecté » et le rôle, en sessionStorage (effacés à la fermeture de l'onglet). */
   var adminStore = {
     get: function (k) { try { return JSON.parse(sessionStorage.getItem(k)); } catch (e) { return null; } },
     set: function (k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
     del: function (k) { try { sessionStorage.removeItem(k); localStorage.removeItem(k); } catch (e) {} }
   };
-  try { localStorage.removeItem('ck_admin_token'); } catch (e) {} /* ancien emplacement */
-  function adminToken() { return adminStore.get('ck_admin_token'); }
+  try { localStorage.removeItem('ck_admin_token'); sessionStorage.removeItem('ck_admin_token'); } catch (e) {} /* anciens emplacements */
+  function adminToken() { return cfg.mock ? adminStore.get('ck_admin_token') : null; }
 
   /* ---------- Supabase : comptes visiteurs (code à 6 chiffres par e-mail) et dépôt des fichiers ---------- */
   var sb = (!cfg.mock && window.supabase && cfg.supabaseUrl && cfg.supabaseKey)
@@ -65,7 +66,7 @@
   function req(method, path, body, opts) {
     opts = opts || {};
     return (opts.admin ? Promise.resolve(adminToken()) : token()).then(function (t) {
-      var headers = { Accept: 'application/json' };
+      var headers = { Accept: 'application/json', 'X-Checkup': '1' };
       if (t) headers.Authorization = 'Bearer ' + t;
       var payload = body;
       if (body && !(body instanceof FormData)) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
@@ -249,7 +250,8 @@
     subscribe: function (id, onEvent) {
       if (cfg.mock) return mockStream(id, onEvent);
       var stopped = false, next = 0, timer = null, fails = 0, debut = Date.now();
-      var MAX_MS = 8 * 60 * 1000; /* au-delà, la fonction serveur (5 min) est forcément arrêtée */
+      var MAX_MS = 14 * 60 * 1000; /* 2 tentatives de 5 min au plus (reprise automatique) + marge */
+      var derniereReprise = 0;
       var base = '/diagnostics/' + encodeURIComponent(id);
       req('POST', base + '/traiter', null, { keepalive: false }).catch(function () { /* le suivi continue : l'état est en base */ });
       function poll() {
@@ -261,6 +263,11 @@
           });
           next = d.suivant != null ? d.suivant : next;
           if (d.termine) { stopped = true; return; }
+          if (d.reprendre && Date.now() - derniereReprise > 30000) {
+            /* traitement coupé côté serveur : on le relance, il reprend à la dernière étape enregistrée */
+            derniereReprise = Date.now();
+            req('POST', base + '/traiter', null).catch(function () {});
+          }
           if (Date.now() - debut > MAX_MS) {
             stopped = true;
             onEvent({ etape: 'ERREUR', progression: 0, niveau: 'erreur', message: 'Le traitement prend plus de temps que prévu. Un conseiller DC-KNOWING vous rappelle ; votre dossier reste visible dans Mes diagnostics.' });
@@ -311,11 +318,14 @@
         if (cfg.mock) return sleep(800).then(function () { adminStore.set('ck_admin_token', 'demo-admin'); return { ok: true }; });
         var body = { email: email, password: password };
         if (code) body.code = code;
-        return req('POST', '/admin/login', body).then(function (d) { adminStore.set('ck_admin_token', d.token || d.access_token); adminStore.set('ck_admin_role', d.role || 'conseiller'); return d; });
+        return req('POST', '/admin/login', body, { admin: true }).then(function (d) { adminStore.set('ck_admin_logged', true); adminStore.set('ck_admin_role', d.role || 'conseiller'); return d; });
       },
-      logout: function () { adminStore.del('ck_admin_token'); adminStore.del('ck_admin_role'); },
+      logout: function () {
+        if (!cfg.mock) req('POST', '/admin/logout', null, { admin: true }).catch(function () {});
+        adminStore.del('ck_admin_token'); adminStore.del('ck_admin_logged'); adminStore.del('ck_admin_role');
+      },
       role: function () { return adminStore.get('ck_admin_role') || 'conseiller'; },
-      isLogged: function () { return !!adminToken(); },
+      isLogged: function () { return cfg.mock ? !!adminToken() : !!adminStore.get('ck_admin_logged'); },
       list: function (jour) { return req('GET', '/admin/diagnostics?jour=' + encodeURIComponent(jour), null, { admin: true }); },
       resend: function (id) { return req('POST', '/admin/diagnostics/' + encodeURIComponent(id) + '/renvoyer', null, { admin: true }); },
       retry: function (id) { return req('POST', '/admin/diagnostics/' + encodeURIComponent(id) + '/relancer', null, { admin: true }); },

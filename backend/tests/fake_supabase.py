@@ -81,7 +81,7 @@ class FakeSupabase:
                      "grade_performance": None, "score_conformite": None, "grade_conformite": None, "couverture_pct": None,
                      "chemin_fichier": None, "chemin_markdown": None, "pages": None, "lecture_partielle": False, "modele_ia": None,
                      "erreur": None, "erreur_publique": None, "rappel_demande": False, "rappel_effectue": False, "entretien_realise": False,
-                     "traitement_depuis": None, "termine_le": None, "envoye_le": None, **r}
+                     "traitement_depuis": None, "tentatives": 0, "termine_le": None, "envoye_le": None, **r}
             if table == "documents":
                 r.setdefault("rapport_id", None)
                 r.setdefault("categorie", "autre")
@@ -155,9 +155,13 @@ class FakeSupabase:
             return None
         if fn == "prendre_traitement":
             r = next((r for r in self.tables["rapports"] if r["id"] == args["p_id"]), None)
-            if not r or r["etape"] in ("TERMINE", "ENVOYE", "ERREUR") or r["traitement_depuis"]:
+            if not r or r["etape"] in ("TERMINE", "ENVOYE", "ERREUR"):
+                return False
+            limite = (datetime.now(UTC) - timedelta(seconds=args["p_bail_secondes"])).isoformat()
+            if r["traitement_depuis"] and r["traitement_depuis"] >= limite:
                 return False
             r["traitement_depuis"] = _now()
+            r["tentatives"] = r.get("tentatives", 0) + 1
             return True
         if fn == "reserver_entretien":
             n = sum(1 for e in self.tables["entretiens"] if e["jour"] == args["p_jour"] and e["heure"] == args["p_heure"]

@@ -7,14 +7,14 @@ import re
 import tempfile
 from pathlib import Path
 
-from . import report
+from . import antivirus, report
 from .anonymize import anonymize
 from .comprehension import comprendre
 from .config import Settings
 from .db import TERMINAUX, Database, now_iso
 from .extraction import DocumentsNonReconnus, Extraction, LectureImpossible, extract
 from .llm import LLMClient, LLMError
-from .pseudonymise import Pseudonymes, pseudonymiser_tableaux
+from .pseudonymise import Pseudonymes, pseudonymiser_pdf, pseudonymiser_tableaux
 from .readers import ReaderError, read_file
 from .schemas import ND, DepotForm
 from .supa import Supabase, SupabaseError
@@ -93,6 +93,10 @@ class Pipeline:
             raise RuntimeError("e-mails désactivés sur les préversions (EMAILS_PREVIEW)")
         self.sb.invoke("envoyer-rapport", body, user_token)
 
+    def note_reprise(self, job_id: str, tentative: int) -> None:
+        job = self.db.get_job(job_id) or {"progression": 5, "statut": "EN_ATTENTE"}
+        self._log(job_id, job["statut"], job["progression"], f"Reprise automatique du traitement (tentative {tentative})")
+
     # ------------------------------------------------------------------ point d'entrée
     def process(self, job_id: str, user_token: str | None = None) -> None:
         """Traite un dépôt. `user_token` : jeton du visiteur, transmis à l'Edge Function d'envoi (contrôle de propriété)."""
@@ -155,6 +159,10 @@ class Pipeline:
                 if len(data) > self.s.max_upload_bytes or total > self.s.max_total_bytes:
                     raise ReaderError(f"fichiers trop volumineux ({total // (1024 * 1024)} Mo au total, "
                                       f"{self.s.max_total_bytes // (1024 * 1024)} Mo maximum)")
+                try:  # contenu actif (macros, JavaScript) et antivirus, avant toute lecture
+                    antivirus.verifier(data, f["nom_fichier"], ext, self.s.clamav_host, self.s.clamav_port, self.s.clamav_obligatoire)
+                except antivirus.FichierRefuse as e:
+                    raise ReaderError(str(e)) from e
                 path = Path(tmp) / f"{i}{ext}"
                 path.write_bytes(data)
                 locaux.append((f["nom_fichier"], path))
@@ -166,9 +174,12 @@ class Pipeline:
                 genres.append(r.kind.upper())
                 nature = TYPES_FICHIERS.get(f.get("categorie", ""), "document")
                 texte = r.text
-                if r.kind in ("csv", "xlsx"):  # tiers (clients, fournisseurs, salariés) pseudonymisés, paie non transmise
+                if r.kind in ("csv", "xlsx", "pdf"):  # tiers (clients, fournisseurs, salariés) pseudonymisés, paie non transmise
                     try:
-                        texte = pseudonymiser_tableaux(path, f["nom_fichier"], pseudo) or "[tableau vide]"
+                        if r.kind == "pdf":
+                            texte = pseudonymiser_pdf(path, f["nom_fichier"], r.text, pseudo)
+                        else:
+                            texte = pseudonymiser_tableaux(path, f["nom_fichier"], pseudo) or "[tableau vide]"
                     except Exception:  # noqa: BLE001 — en cas de doute, rien ne part
                         log.exception("job %s : pseudonymisation impossible (%s)", job_id, f["nom_fichier"])
                         texte = "[contenu non transmis : structure du tableau non analysée]"

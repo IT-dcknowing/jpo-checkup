@@ -41,6 +41,7 @@ from .security import (
 from .supa import Supabase, SupabaseError
 
 MIME = {".csv": "text/csv", ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".pdf": "application/pdf"}
+ADMIN_COOKIE = "ck_admin"
 MSG_INTERROMPU = "Votre diagnostic n'a pas pu être produit automatiquement. Un conseiller DC-KNOWING vous rappelle très vite."
 
 log = logging.getLogger("jpo.api")
@@ -166,7 +167,14 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
         ADMIN_TOKEN_VERSION révoque les jetons déjà émis ; retirer le compte aussi."""
         if not s.admin_accounts:
             raise HTTPException(503, "Espace conseiller désactivé (aucun compte configuré)")
-        sujet = verify_token(s.secret_key, bearer(request), "admin") or ""
+        jeton = bearer(request)
+        if not jeton and request.headers.get("authorization") is None:
+            # navigateur : jeton dans un cookie HttpOnly (illisible par un script). Anti-CSRF : cookie SameSite=Strict
+            # ET en-tête X-Checkup exigé pour toute action (un site tiers ne peut pas l'ajouter sans pré-vérification CORS)
+            jeton = request.cookies.get(ADMIN_COOKIE, "")
+            if jeton and request.method != "GET" and request.headers.get("x-checkup") != "1":
+                raise HTTPException(403, "Requête refusée (en-tête de sécurité absent)")
+        sujet = verify_token(s.secret_key, jeton, "admin") or ""
         user, _, fp = sujet.rpartition(":")
         acc = account(user)
         if not acc or not hmac.compare_digest(fp, fingerprint(acc)):
@@ -320,20 +328,29 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
         job = own_job(job_id, user)
         if job["statut"] in TERMINAUX:
             return {"etat": "termine"}
+        if job["tentatives"] >= s.max_tentatives and db.is_stale(job):
+            mark_interrupted(db, job)
+            return {"etat": "termine"}
         if not db.claim(job_id):
             return JSONResponse(status_code=202, content={"etat": "en_cours"})
+        if job["tentatives"] >= 1:  # verrou repris après une coupure : reprise là où le traitement s'était arrêté
+            pipeline.note_reprise(job_id, job["tentatives"] + 1)
         pipeline.process(job_id, user["token"])
         return {"etat": "termine"}
 
     @app.get("/api/diagnostics/{job_id}/journal")
     def journal(job_id: str, depuis: int = 0, user: dict = Depends(visitor)):
         job = own_job(job_id, user)
-        if db.is_stale(job):  # fonction coupée en cours de route : le visiteur est fixé tout de suite, sans attendre le cron
-            mark_interrupted(db, job)
-            job = own_job(job_id, user)
+        reprendre = False
+        if db.is_stale(job):  # fonction coupée en cours de route : reprise automatique, puis erreur si elle échoue encore
+            if job["tentatives"] < s.max_tentatives:
+                reprendre = True  # le navigateur relance POST /traiter, qui reprend depuis la dernière étape enregistrée
+            else:
+                mark_interrupted(db, job)
+                job = own_job(job_id, user)
         events = job["journal"]
         return {"evenements": events[max(depuis, 0):], "suivant": len(events), "termine": job["statut"] in TERMINAUX,
-                "statut": FRONT_ETAPE[job["statut"]]}
+                "statut": FRONT_ETAPE[job["statut"]], "reprendre": reprendre}
 
     @app.get("/api/diagnostics/{job_id}")
     def diagnostic(job_id: str, user: dict = Depends(visitor)):
@@ -426,6 +443,27 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
             raise HTTPException(401, "Non autorisé")
         return purge(db, sb, s)
 
+    @app.api_route("/api/worker", methods=["GET", "POST"])
+    def worker(request: Request):
+        """Reprise automatique sans navigateur (visiteur parti) : appelé chaque minute par pg_cron + pg_net (voir
+        DEPLOIEMENT.md §9.1), protégé par CRON_SECRET. Traite au plus un dossier par appel (une fonction = un traitement)."""
+        if not s.cron_secret or not hmac.compare_digest(bearer(request), s.cron_secret):
+            raise HTTPException(401, "Non autorisé")
+        interrompus = 0
+        for job in db.pending_jobs():
+            if not db.is_stale(job, attente_minutes=2):
+                continue
+            if job["tentatives"] >= s.max_tentatives:
+                mark_interrupted(db, job)
+                interrompus += 1
+                continue
+            if db.claim(job["id"]):
+                if job["tentatives"] >= 1:
+                    pipeline.note_reprise(job["id"], job["tentatives"] + 1)
+                pipeline.process(job["id"])
+                return {"traite": job["id"], "interrompus": interrompus}
+        return {"traite": None, "interrompus": interrompus}
+
     # ------------------------------------------------------------------ conseillers
     def tentative(cle: str, maximum: int, fenetre: int) -> bool:
         """Limitation partagée entre toutes les instances (base) ; repli en mémoire si la base ne répond pas."""
@@ -462,7 +500,17 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
             raise HTTPException(401, "Identifiants invalides")
         db.audit(None, user, "login", ip)
         token = sign_token(s.secret_key, "admin", f"{user}:{fingerprint(acc)}", s.admin_token_ttl)
-        return {"token": token, "expire_dans_s": s.admin_token_ttl, "role": acc["role"]}
+        # le jeton n'est remis que dans un cookie HttpOnly : aucun script de la page ne peut le lire ni l'exfiltrer
+        resp = JSONResponse({"ok": True, "expire_dans_s": s.admin_token_ttl, "role": acc["role"]})
+        resp.set_cookie(ADMIN_COOKIE, token, max_age=s.admin_token_ttl, path="/api/admin", httponly=True, secure=s.on_vercel,
+                        samesite="strict")
+        return resp
+
+    @app.post("/api/admin/logout")
+    def logout():
+        resp = JSONResponse({"ok": True})
+        resp.delete_cookie(ADMIN_COOKIE, path="/api/admin", httponly=True, secure=s.on_vercel, samesite="strict")
+        return resp
 
     def admin_view(job: dict, booking: dict | None, detail: bool = False) -> dict:
         form = job["form"]

@@ -117,7 +117,7 @@ def test_documents_supprimes_apres_analyse(client, tok):
 
 
 def test_relance_refusee_sans_fichiers_ni_resultat(client, tok):
-    h = auth(client.post("/api/admin/login", json=ADMIN).json()["token"])
+    h = auth(client.post("/api/admin/login", json=ADMIN).cookies["ck_admin"])
     job = depot(client, tok).json()["job_id"]
     row = client.sb.tables["rapports"][0]
     row.update(etape="ERREUR", statut="erreur")
@@ -126,12 +126,35 @@ def test_relance_refusee_sans_fichiers_ni_resultat(client, tok):
 
 
 # ------------------------------------------------------------------ N-2 : traitement interrompu détecté au suivi
-def test_traitement_coupe_detecte_par_le_suivi(client, tok):
+def test_traitement_coupe_repris_automatiquement(client, tok):
+    """R-10 : fonction coupée -> le suivi demande une reprise, qui repart de la dernière étape enregistrée."""
     job = depot(client, tok).json()["job_id"]
     row = client.sb.tables["rapports"][0]
-    row["traitement_depuis"] = (datetime.now(UTC) - timedelta(minutes=7)).isoformat()
+    row.update(traitement_depuis=(datetime.now(UTC) - timedelta(minutes=7)).isoformat(), tentatives=1)
     j = client.get(f"/api/diagnostics/{job}/journal", headers=auth(tok)).json()
-    assert j["termine"] and j["statut"] == "ERREUR" and j["evenements"][-1]["niveau"] == "erreur"
+    assert j["reprendre"] and not j["termine"]
+    v = traiter(client, tok, job)
+    assert v["statut"] == "ENVOYE" and row["tentatives"] == 2
+    msgs = [e["message"] for e in client.get(f"/api/diagnostics/{job}/journal", headers=auth(tok)).json()["evenements"]]
+    assert any("Reprise automatique" in m for m in msgs)
+
+
+def test_traitement_coupe_trop_souvent_passe_en_erreur(client, tok):
+    job = depot(client, tok).json()["job_id"]
+    row = client.sb.tables["rapports"][0]
+    row.update(traitement_depuis=(datetime.now(UTC) - timedelta(minutes=7)).isoformat(), tentatives=2)
+    j = client.get(f"/api/diagnostics/{job}/journal", headers=auth(tok)).json()
+    assert j["termine"] and j["statut"] == "ERREUR" and j["evenements"][-1]["niveau"] == "erreur" and not j["reprendre"]
+
+
+def test_worker_reprend_sans_navigateur(client, tok):
+    job = depot(client, tok).json()["job_id"]
+    row = client.sb.tables["rapports"][0]
+    row["created_at"] = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()  # visiteur parti avant le traitement
+    assert client.post("/api/worker").status_code == 401
+    out = client.post("/api/worker", headers=auth("secret-cron-test")).json()
+    assert out["traite"] == job and row["etape"] == "ENVOYE"
+    assert client.post("/api/worker", headers=auth("secret-cron-test")).json()["traite"] is None
 
 
 def test_traitement_en_cours_non_interrompu(client, tok):
@@ -205,7 +228,7 @@ def test_mot_de_passe_hache_et_totp(settings):
     assert c.post("/api/admin/login", json={**ident, "code": "000000" if totp_code(secret) != "000000" else "111111"}).status_code == 401
     r = c.post("/api/admin/login", json={**ident, "code": totp_code(secret)})
     assert r.status_code == 200 and r.json()["role"] == "conseiller"
-    h = auth(r.json()["token"])
+    h = auth(r.cookies["ck_admin"])
     assert c.get("/api/admin/diagnostics?jour=2026-12-16", headers=h).status_code == 200
     # changement de mot de passe : les jetons déjà émis sont révoqués
     settings.admin_accounts["conseiller@dc-knowing.ci"]["secret"] = hash_password("nouveau-mot-de-passe")
@@ -227,14 +250,14 @@ def test_verrouillage_du_compte(settings):
 
 def test_role_lecture(settings):
     c = _app_admin(settings, {"l@dc-knowing.ci": {"secret": hash_password("lecture-seule-mdp"), "totp": "", "role": "lecture"}})
-    h = auth(c.post("/api/admin/login", json={"email": "l@dc-knowing.ci", "password": "lecture-seule-mdp"}).json()["token"])
+    h = auth(c.post("/api/admin/login", json={"email": "l@dc-knowing.ci", "password": "lecture-seule-mdp"}).cookies["ck_admin"])
     assert c.get("/api/admin/diagnostics?jour=2026-12-16", headers=h).status_code == 200
     assert c.get("/api/admin/diagnostics.csv?jour=2026-12-16", headers=h).status_code == 403
 
 
 def test_revocation_globale(settings):
     c = _app_admin(settings, {"a@dc-knowing.ci": {"secret": hash_password("bon-mot-de-passe"), "totp": "", "role": "conseiller"}})
-    h = auth(c.post("/api/admin/login", json={"email": "a@dc-knowing.ci", "password": "bon-mot-de-passe"}).json()["token"])
+    h = auth(c.post("/api/admin/login", json={"email": "a@dc-knowing.ci", "password": "bon-mot-de-passe"}).cookies["ck_admin"])
     settings.admin_token_version = "2"
     assert c.get("/api/admin/diagnostics?jour=2026-12-16", headers=h).status_code == 401
 
@@ -351,3 +374,98 @@ def test_xlsx_chiffre_refuse(tmp_path):
 
 def test_formulaire_inchange():
     assert FORM["consentement_artci"] == "true"
+
+
+# ------------------------------------------------------------------ R-02 (PDF) : tiers et paie dans un PDF
+def test_pdf_tiers_et_paie(tmp_path):
+    from app.pseudonymise import pseudonymiser_pdf
+    p = tmp_path / "grand_livre.pdf"
+    p.write_bytes(_pdf(["Facture 12 Client : KOUAME Jean  montant 1500000", "Reglement de Mme TRAORE Aminata 300000",
+                        "Total ventes 1800000"]))
+    pseudo = Pseudonymes()
+    txt = pseudonymiser_pdf(p, p.name, read_file(p).text, pseudo)
+    assert "KOUAME" not in txt and "TRAORE" not in txt and "1500000" in txt and "Total ventes 1800000" in txt
+    paie = tmp_path / "bulletins_paie.pdf"
+    paie.write_bytes(_pdf(["Salarie KONE Ibrahim brut 450000", "Salarie YAO Akissi brut 520000", "Total brut 970000"]))
+    txt = pseudonymiser_pdf(paie, paie.name, read_file(paie).text, Pseudonymes())
+    assert "KONE" not in txt and "YAO" not in txt and "450000" not in txt and "Total brut 970000" in txt
+
+
+def test_pdf_pseudonymise_dans_le_pipeline(settings):
+    sb, llm = FakeSupabase(), FakeLLM()
+    with TestClient(create_app(settings, llm=llm, sb=sb)) as c:
+        c.sb = sb
+        t = sb.add_user("x@exemple.ci")
+        data = _pdf(["BALANCE 2025", "701 Ventes 125000000", "411 Client : KOUAME Jean 500000"])
+        docs = [{"id": deposer_fichier(sb, t, nom="balance.pdf", data=data, categorie="balance"), "type": "balance"}]
+        traiter(c, t, depot(c, t, docs=docs).json()["job_id"])
+    assert "KOUAME" not in llm.prompts[0] and "125000000" in llm.prompts[0]
+
+
+# ------------------------------------------------------------------ R-20 : contenu actif et antivirus
+def test_contenu_actif_refuse(tmp_path):
+    from app.antivirus import FichierRefuse, contenu_actif, verifier
+    assert contenu_actif(b"%PDF-1.4 << /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >>", ".pdf")
+    assert contenu_actif(_pdf(["Total actif 1000"]), ".pdf") is None
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("xl/workbook.xml", "x")
+        z.writestr("xl/vbaProject.bin", "macro")
+    assert "macros" in contenu_actif(buf.getvalue(), ".xlsx")
+    with pytest.raises(FichierRefuse):
+        verifier(buf.getvalue(), "piege.xlsx", ".xlsx")
+
+
+def _faux_clamd(reponse: bytes):
+    import socket
+    import threading
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+
+    def run():
+        conn, _ = srv.accept()
+        with conn:
+            data = b""
+            while not data.endswith(b"\0\0\0\0"):
+                part = conn.recv(65536)
+                if not part:
+                    break
+                data += part
+            conn.sendall(reponse)
+        srv.close()
+    threading.Thread(target=run, daemon=True).start()
+    return srv.getsockname()[1]
+
+
+def test_antivirus_clamd():
+    from app.antivirus import FichierRefuse, verifier
+    verifier(b"a;b\n1;2\n", "ok.csv", ".csv", "127.0.0.1", _faux_clamd(b"stream: OK\0"))
+    with pytest.raises(FichierRefuse, match="Eicar"):
+        verifier(b"X5O!P%@AP", "eicar.csv", ".csv", "127.0.0.1", _faux_clamd(b"stream: Eicar-Test-Signature FOUND\0"))
+    verifier(b"x", "x.csv", ".csv", "127.0.0.1", 1)  # injoignable, non obligatoire : passe (journalisé)
+    with pytest.raises(FichierRefuse, match="indisponible"):
+        verifier(b"x", "x.csv", ".csv", "127.0.0.1", 1, obligatoire=True)
+
+
+def test_fichier_actif_bloque_le_traitement(client, tok):
+    data = _pdf(["BALANCE"]).replace(b"/Type /Catalog", b"/Type /Catalog /OpenAction << /S /JavaScript /JS (x) >>")
+    docs = [{"id": deposer_fichier(client.sb, tok, nom="b.pdf", data=data), "type": "balance"}]
+    v = traiter(client, tok, depot(client, tok, docs=docs).json()["job_id"])
+    assert v["statut"] == "ERREUR" and "JavaScript" in client.sb.tables["rapports"][0]["erreur"]
+
+
+# ------------------------------------------------------------------ R-16 : jeton conseiller en cookie HttpOnly
+def test_jeton_conseiller_en_cookie_httponly(settings):
+    c = _app_admin(settings, {"a@dc-knowing.ci": {"secret": hash_password("bon-mot-de-passe"), "totp": "", "role": "conseiller"}})
+    r = c.post("/api/admin/login", json={"email": "a@dc-knowing.ci", "password": "bon-mot-de-passe"})
+    assert "token" not in r.json()
+    cookie = r.headers["set-cookie"].lower()
+    assert "httponly" in cookie and "samesite=strict" in cookie and "path=/api/admin" in cookie
+    assert c.get("/api/admin/diagnostics?jour=2026-12-16").status_code == 200           # cookie seul
+    t = c.sb.add_user("v@exemple.ci")
+    job = depot(c, t).json()["job_id"]
+    assert c.post(f"/api/admin/diagnostics/{job}/rappel-effectue").status_code == 403  # sans en-tête anti-CSRF
+    assert c.post(f"/api/admin/diagnostics/{job}/rappel-effectue", headers={"X-Checkup": "1"}).status_code == 200
+    c.post("/api/admin/logout")
+    assert c.get("/api/admin/diagnostics?jour=2026-12-16").status_code == 401

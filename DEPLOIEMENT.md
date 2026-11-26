@@ -107,7 +107,8 @@ python -m app.security hash                              # saisir le mot de pass
 python -m app.security totp prenom.nom@dc-knowing.com    # clé TOTP + lien à scanner dans l'application d'authentification
 ```
 Format : `a@dc-knowing.com=scrypt$...,totp=ABCD...;b@dc-knowing.com=scrypt$...,role=lecture` (rôle `lecture` :
-consultation seule, sans export CSV, téléchargement Markdown ni action). Jetons valables 4 h (`ADMIN_TOKEN_HOURS`).
+consultation seule, sans export CSV, téléchargement Markdown ni action). Session de 4 h (`ADMIN_TOKEN_HOURS`) dans un
+cookie HttpOnly (illisible par les scripts de la page), protégé contre le CSRF (SameSite=Strict + en-tête `X-Checkup`).
 Changer le mot de passe ou la clé TOTP d'un compte révoque ses jetons ; changer `ADMIN_TOKEN_VERSION` les révoque tous.
 
 Réglages du projet : *Framework Preset* « Other » ; le reste vient de `vercel.json` (dont la CSP : si l'URL du projet
@@ -175,13 +176,38 @@ tests SQL, `node --check`, npm audit et `deno check` de l'Edge Function.
 - *Vercel > Logs* : journaux JSON (niveau, module, message) ; filtrer `"niveau":"ERROR"` et `purge :` (résultat quotidien).
 - Alerte à configurer dans Vercel (ou Sentry) si le cron renvoie autre chose que 200.
 
+### 9.1 Reprise automatique des traitements (file d'attente en base)
+Les dossiers non terminés forment la file (`rapports` dont l'étape n'est pas terminale). Un traitement coupé (limite de
+300 s de Vercel) est **repris automatiquement** à la dernière étape enregistrée (le résultat de l'IA est conservé) :
+- par le navigateur du visiteur : le suivi détecte la coupure (verrou expiré) et relance `/traiter` ;
+- sans navigateur (visiteur parti) : `/api/worker`, appelé chaque minute par Supabase (pg_cron + pg_net), protégé par
+  `CRON_SECRET`, reprend un dossier par appel.
+Au-delà de `MAX_TENTATIVES` (2 par défaut), le dossier passe en erreur et le visiteur est prévenu.
+
+Planification (Supabase > SQL Editor ; extensions *pg_cron* et *pg_net* activées dans *Database > Extensions*) :
+```sql
+select vault.create_secret('<valeur de CRON_SECRET>', 'cron_secret');
+select cron.schedule('jpo-worker', '* * * * *', $$
+  select net.http_post(
+    url := 'https://<domaine>/api/worker',
+    headers := jsonb_build_object('Authorization', 'Bearer ' ||
+      (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret')),
+    timeout_milliseconds := 1000);
+$$);
+```
+(`timeout_milliseconds` court : pg_net n'attend pas la fin du traitement, la fonction Vercel continue seule.)
+
+### 9.2 Antivirus (facultatif)
+Toujours actif : refus des PDF avec JavaScript ou action automatique et des classeurs avec macros ou objets incorporés.
+Analyse ClamAV en plus : héberger un démon `clamd` joignable depuis Vercel (par exemple l'image Docker
+`clamav/clamav` sur un petit serveur, port 3310 ouvert **uniquement** aux adresses de sortie Vercel ou via un tunnel),
+puis `CLAMAV_HOST`, `CLAMAV_PORT` et, pour bloquer si l'antivirus ne répond pas, `CLAMAV_OBLIGATOIRE=1`.
+
 ## 10. Limites connues
-- **Traitement synchrone** : le diagnostic s'exécute dans la requête (300 s au plus). Budget IA de 170 s et rendu Word
-  de 60 s au plus par défaut ; un traitement coupé est signalé au visiteur au bout de 6 min (et non plus le lendemain).
-  Une file d'attente (QStash, Inngest) reste recommandée au-delà de quelques dizaines de traitements simultanés.
+- **Traitement synchrone** : un traitement s'exécute dans une fonction de 300 s au plus (budget IA 170 s, rendu Word
+  60 s) ; les coupures sont reprises automatiquement (§9.1). Plusieurs dizaines de traitements simultanés restent
+  bornés par les quotas du fournisseur d'IA.
 - **Contrôle « 4 pages »** : impossible sans LibreOffice (absent de Vercel) ; le gabarit tient en 4 pages sur les cas types.
-- **PDF** : leur texte n'a pas de colonnes ; seuls les identifiants du déclarant y sont anonymisés (journaux nominatifs :
-  demander CSV ou XLSX, comme l'indique la notice).
-- **Antivirus** : pas d'analyse antivirale des fichiers (non disponible sur Vercel) ; les fichiers ne sont jamais
-  exécutés ni servis à d'autres utilisateurs, contrôlés (signature, taille, archive chiffrée ou anormale) et supprimés
-  après analyse.
+- **PDF** : les tiers sont pseudonymisés au mieux (tableaux détectés, civilités, étiquettes « Client : »…, paie réduite
+  aux totaux) ; un nom isolé au fil du texte peut subsister (la notice recommande CSV ou XLSX).
+- **Conformité** : registre, AIPD et liste des sous-traitants dans `docs/conformite/` (à valider par un juriste).

@@ -124,6 +124,12 @@ class Settings:
         self.max_user_bytes_day = _int("MAX_USER_MB_JOUR", 200) * 1024 * 1024  # par visiteur et par 24 h
         self.max_files_hour = _int("MAX_FICHIERS_HEURE", 30)                   # autorisations d'envoi par visiteur et par heure
         self.rate_limit = _int("RATE_LIMIT_PER_HOUR", 5)
+        # Reprise automatique : nombre total de tentatives de traitement avant de passer le dossier en erreur
+        self.max_tentatives = max(1, _int("MAX_TENTATIVES", 2))
+        # Antivirus (facultatif) : démon clamd joignable en TCP
+        self.clamav_host = e("CLAMAV_HOST", "").strip()
+        self.clamav_port = _int("CLAMAV_PORT", 3310)
+        self.clamav_obligatoire = e("CLAMAV_OBLIGATOIRE", "0") == "1"
         self.event_days = _csv("EVENT_DAYS", DEFAULT_EVENT_DAYS)
         self.workers = _int("WORKERS", 4)
 

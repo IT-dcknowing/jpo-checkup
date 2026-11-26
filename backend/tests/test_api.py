@@ -40,7 +40,7 @@ def traiter(client, token, job_id):
 
 
 def admin_headers(client):
-    return auth(client.post("/api/admin/login", json=ADMIN).json()["token"])
+    return auth(client.post("/api/admin/login", json=ADMIN).cookies["ck_admin"])
 
 
 @pytest.fixture

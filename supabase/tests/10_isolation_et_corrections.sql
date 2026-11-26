@@ -45,6 +45,14 @@ select public.fusionner_donnees((select id from public.rapports limit 1), '{"res
 select public.fusionner_donnees((select id from public.rapports limit 1), '{"alertes":[1]}');
 select pg_temp.ok((select donnees ? 'resume' and donnees ? 'alertes' from public.rapports limit 1), 'fusion sans perte de clé');
 
+-- ---------------------------------------------------------------- reprise automatique : verrou avec bail et tentatives
+select pg_temp.ok(public.prendre_traitement((select id from public.rapports limit 1), 330), 'première prise du verrou');
+select pg_temp.ok(not public.prendre_traitement((select id from public.rapports limit 1), 330), 'verrou déjà pris');
+update public.rapports set traitement_depuis = now() - interval '10 minutes';
+select pg_temp.ok(public.prendre_traitement((select id from public.rapports limit 1), 330), 'reprise après expiration du bail');
+select pg_temp.ok((select tentatives from public.rapports limit 1) = 2, 'deux tentatives comptées');
+update public.rapports set traitement_depuis = null;
+
 -- ---------------------------------------------------------------- quotas partagés
 select pg_temp.ok(public.consommer_quota('t', 3, 5, 60) and public.consommer_quota('t', 2, 5, 60) and not public.consommer_quota('t', 1, 5, 60),
   'consommer_quota respecte le maximum');

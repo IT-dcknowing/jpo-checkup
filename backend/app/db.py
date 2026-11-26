@@ -56,7 +56,7 @@ def _job(row: dict) -> dict:
         "email_envoye_at": row["envoye_le"], "erreur": row["erreur"], "erreur_publique": row["erreur_publique"],
         "rappel_demande": row["rappel_demande"], "rappel_effectue": row["rappel_effectue"],
         "entretien_realise": row["entretien_realise"], "created_at": row["created_at"], "completed_at": row["termine_le"],
-        "traitement_depuis": row.get("traitement_depuis"),
+        "traitement_depuis": row.get("traitement_depuis"), "tentatives": row.get("tentatives") or 0,
     }
 
 
@@ -141,6 +141,12 @@ class Database:
         if depuis:
             return datetime.fromisoformat(str(depuis).replace("Z", "+00:00")) < now - timedelta(seconds=bail_seconds)
         return datetime.fromisoformat(str(job["created_at"]).replace("Z", "+00:00")) < now - timedelta(minutes=attente_minutes)
+
+    def pending_jobs(self, limit: int = 50) -> list[dict]:
+        """Dossiers non terminés, du plus ancien au plus récent (reprise automatique par le worker)."""
+        rows = self.sb.select("rapports", {"select": "*", "etape": "not.in.(TERMINE,ENVOYE,ERREUR)", "order": "created_at.asc",
+                                           "limit": str(limit)})
+        return [_job(r) for r in rows]
 
     def stale_jobs(self, minutes: int) -> list[dict]:
         """Traitements interrompus (fonction arrêtée) : non terminés et sans activité depuis `minutes`."""
