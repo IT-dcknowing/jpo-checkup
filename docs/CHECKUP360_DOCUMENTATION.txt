@@ -1,0 +1,442 @@
+================================================================================
+ CHECK-UP 360 — DOCUMENTATION COMPLÈTE DE L'APPLICATION
+ Journées Portes Ouvertes DC-KNOWING · 16, 17 et 18 décembre 2026
+ Siège du Cabinet DC-KNOWING, Cocody Riviera 2 (Collège André Malraux), Abidjan
+================================================================================
+ Version du document : 26 novembre 2026
+ Adresse de production : https://jpo-checkup.vercel.app
+ Espace conseillers    : https://jpo-checkup.vercel.app/conseiller.html
+ Code source           : https://github.com/IT-dcknowing/jpo-checkup (branche main)
+ Les identifiants et mots de passe ne figurent PAS ici : voir la fiche
+ confidentielle « Acces_Check-up360_CONFIDENTIEL.pdf ».
+
+
+SOMMAIRE
+  1. Ce qu'est le Check-up 360
+  2. Le programme des Journées Portes Ouvertes
+  3. Le parcours du visiteur, écran par écran
+  4. L'espace conseillers
+  5. Le traitement d'un diagnostic, étape par étape
+  6. La compréhension des fichiers déposés
+  7. La logique de calcul : indicateurs, scores, notes
+  8. Le plan d'action et les modules de La Suite Flow
+  9. Le rapport Word (4 pages)
+ 10. Les e-mails envoyés
+ 11. Données, sécurité et confidentialité
+ 12. Architecture technique
+ 13. Exploitation : réglages, comptes, maintenance
+ 14. Limites connues et points ouverts
+
+
+--------------------------------------------------------------------------------
+ 1. CE QU'EST LE CHECK-UP 360
+--------------------------------------------------------------------------------
+ Le Check-up 360 est un diagnostic financier et de conformité, automatique et
+ gratuit, proposé aux visiteurs des Journées Portes Ouvertes DC-KNOWING.
+
+ En une dizaine de minutes, le dirigeant :
+   - répond à un court formulaire (entreprise, fiscalité, obligations) ;
+   - dépose ses documents comptables (balance, bilan, journaux...) ;
+   - reçoit par e-mail un rapport Word en langage simple : santé financière,
+     conformité fiscale et sociale, plan d'action priorisé ;
+   - réserve un entretien individuel avec un conseiller pendant l'événement.
+
+ Objectifs pour le cabinet :
+   - donner une valeur immédiate et concrète à la visite ;
+   - préparer l'entretien du conseiller (le rapport sert de support) ;
+   - identifier les besoins (FNE, paie, trésorerie...) et orienter vers les
+     modules de La Suite Flow (Sell, RH, Compta, Legal, Task) ;
+   - qualifier les visiteurs : client actuel, ancien client, première visite.
+
+ Le diagnostic n'est ni un audit, ni une certification des comptes, ni un avis
+ juridique (mention portée dans le rapport et les e-mails).
+
+
+--------------------------------------------------------------------------------
+ 2. LE PROGRAMME DES JOURNÉES PORTES OUVERTES
+--------------------------------------------------------------------------------
+ Lieu : siège DC-KNOWING, Cocody Riviera 2, Abidjan.
+ Le Check-up 360 et les entretiens individuels se déroulent en continu.
+
+ MERCREDI 16 DÉCEMBRE 2026 (08h30 – 17h30)
+   08:30  Accueil des visiteurs — enregistrement et remise des badges
+   09:00  Ouverture par le cabinet DC-KNOWING
+   09:30  Check-up 360 et entretiens individuels (en continu jusqu'à 17h30)
+   10:30  Présentation des 5 applications de La Suite Flow (Sell, RH, Compta,
+          Legal, Task)
+   14:30  Atelier : la FNE en pratique (avec Flow Sell et Flow Compta)
+   16:30  Démonstrations libres
+
+ JEUDI 17 DÉCEMBRE 2026 (10h30 – 17h30)
+   10:30  Accueil des visiteurs — enregistrement et remise des badges
+   11:00  Présentation de La Suite Flow
+   11:00  Check-up 360 et entretiens individuels (en continu jusqu'à 17h30)
+   14:30  Atelier : paie et déclarations sociales (avec Flow RH)
+   16:00  Démonstrations Flow Legal et Flow Task
+
+ VENDREDI 18 DÉCEMBRE 2026 (08h30 – 17h00)
+   08:30  Accueil des visiteurs — enregistrement et remise des badges
+   09:30  Check-up 360 et entretiens individuels (en continu jusqu'à 17h00)
+   10:30  Présentation des 5 applications de La Suite Flow
+   14:30  Atelier : piloter sa trésorerie (avec Flow Compta)
+   17:00  Clôture des Journées
+
+ Créneaux d'entretien individuel (30 minutes, 1 visiteur par créneau) :
+   09:00 09:30 10:00 10:30 11:00 11:30 14:00 14:30 15:00 15:30 16:00 16:30
+   (le jeudi 17, à partir de 10:30 seulement)
+
+ Le programme est modifiable dans assets/js/app-visiteur.js (constante PROG).
+
+
+--------------------------------------------------------------------------------
+ 3. LE PARCOURS DU VISITEUR, ÉCRAN PAR ÉCRAN
+--------------------------------------------------------------------------------
+ 3.1 Accueil (https://jpo-checkup.vercel.app)
+   - Titre « Votre diagnostic Check-up 360 en 10 minutes ».
+   - Dates et lieu, « Trois étapes, sans rendez-vous », présentation du
+     rapport, « Vos chiffres restent les vôtres » (confidentialité),
+     présentation de l'écosystème La Suite Flow.
+   - Boutons : « Commencer mon diagnostic », « Mes diagnostics », « Programme ».
+
+ 3.2 Connexion (sans mot de passe)
+   - Écran 1 « Quelle est votre adresse e-mail ? » : le visiteur saisit son
+     e-mail professionnel.
+   - Il reçoit un e-mail « Votre code d'accès » avec un code à 6 chiffres,
+     valable 10 minutes, à usage unique.
+   - Écran 2 « Saisissez le code reçu » : 3 essais, renvoi possible après
+     60 secondes. Le compte est créé automatiquement à la première connexion ;
+     le code confirme l'adresse e-mail.
+   - Un lien de connexion est aussi présent dans l'e-mail (connexion en un clic).
+
+ 3.3 Formulaire en 6 étapes (brouillon enregistré automatiquement)
+   Étape 1 « Votre entreprise » : raison sociale, NCC (facultatif), secteur
+     (17 secteurs), effectif, type de visiteur (client actuel / ancien client /
+     première fois).
+   Étape 2 « Vous et votre visite » : nom du contact, téléphone, jour de visite
+     (16, 17 ou 18 décembre). L'e-mail est celui de la connexion.
+   Étape 3 « Votre fiscalité » : régime fiscal (TEE, RME, réel simplifié,
+     réel normal, je ne sais pas), FNE (activée, en cours, non activée, je ne
+     sais pas), TVA exonérée oui/non. La question FNE n'est pas posée aux
+     secteurs exemptés (banque, assurance, pharmacie, station-service,
+     compagnie aérienne, concessionnaire eau/électricité/téléphone).
+   Étape 4 « Vos obligations déclaratives » : pour DGI, CNPS, ITS, CMU, DISA :
+     à jour / en retard / ne sait pas.
+   Étape 5 « Vos documents comptables » : jusqu'à 10 fichiers, 20 Mo chacun,
+     formats CSV, XLSX, PDF.
+       - Balance générale (recommandée, suffit souvent à elle seule)
+       - Compte de résultat
+       - Bilan
+       - Autres documents : PLUSIEURS fichiers possibles (sélection multiple ou
+         glisser-déposer) : journaux de ventes, d'achats, de paie, grand livre...
+     Les fichiers partent directement dans le stockage privé du visiteur.
+   Étape 6 « Vérifiez et lancez » : récapitulatif, consentement ARTCI
+     obligatoire, bouton de lancement.
+
+ 3.4 Suivi en direct « Nous préparons votre diagnostic »
+   - Barre de progression, 5 étapes (Lecture, Analyse, Calcul, Rapport, Envoyé)
+     et « Flux d'avancement en direct » : chaque événement réel du traitement
+     s'affiche (fichiers reçus, documents reconnus, totaux calculés,
+     anonymisation, extraction IA, scores, rapport, e-mail).
+   - Durée habituelle : 1 à 3 minutes (5 minutes au maximum).
+   - En cas d'échec : message réel expliquant la cause, boutons « Déposer
+     d'autres fichiers » et « Être rappelé maintenant ».
+
+ 3.5 Résultat « Votre rapport est prêt »
+   - Scores animés (santé financière et conformité, de 0 à 100, notes A à D),
+     verdict, points forts, points à traiter, alerte principale, « Vos premières
+     actions » (plan d'action), téléchargement du rapport Word (lien sécurisé
+     valable 7 jours), réservation de l'entretien.
+
+ 3.6 « Mes diagnostics » (espace personnel)
+   - « Bonjour {prénom} », liste de ses rapports (en cours, envoyés, en erreur),
+     ouverture et téléchargement, suivi d'un traitement en cours.
+   - Invitation à l'événement (téléchargeable en fichier agenda .ics ou envoyée
+     par e-mail), programme, réservation ou modification de l'entretien.
+   - Suppression de toutes ses données (droit à l'effacement, loi n°2013-450) :
+     fichiers, rapports, entretiens, profil et compte.
+
+
+--------------------------------------------------------------------------------
+ 4. L'ESPACE CONSEILLERS (conseiller.html)
+--------------------------------------------------------------------------------
+ Accès : e-mail + mot de passe (comptes définis dans la variable ADMIN_ACCOUNTS
+ sur Vercel). Page non indexée par les moteurs de recherche.
+
+ Fonctions :
+   - Onglets Mer. 16 / Jeu. 17 / Ven. 18 : liste des diagnostics du jour,
+     rafraîchie toutes les 10 secondes.
+   - Compteurs : diagnostics du jour, envoyés, en cours, erreurs à rappeler.
+   - Filtres (statut, type de visiteur) et recherche (entreprise, référence).
+   - Détail d'un dossier : entreprise, contact (nom, e-mail, téléphone), scores,
+     alertes, plan d'action, historique RÉEL du traitement (horodaté), journal
+     d'audit RÉEL (qui a fait quoi et quand).
+   - Actions : ouvrir/télécharger le rapport Word, renvoyer l'e-mail du rapport,
+     relancer un traitement en erreur, marquer « entretien réalisé » ou
+     « rappel effectué ».
+   - Export CSV de la journée (compatible Excel, protégé contre l'injection de
+     formules).
+ Les noms réels des entreprises ne sont visibles que dans cet espace.
+
+
+--------------------------------------------------------------------------------
+ 5. LE TRAITEMENT D'UN DIAGNOSTIC, ÉTAPE PAR ÉTAPE
+--------------------------------------------------------------------------------
+ Le traitement s'exécute dans une fonction serveur (5 minutes maximum). Un
+ verrou en base empêche qu'un même dossier soit traité deux fois en parallèle.
+ Chaque étape écrit un événement dans le journal du dossier (lu par l'écran de
+ suivi et par l'espace conseillers). Le traitement est reprenable : si l'IA a
+ déjà répondu, une relance repart des chiffres enregistrés.
+
+  1. Création du dossier : référence séquentielle JPO-2026-0001, 0002...
+     (limite : 5 dépôts par heure et par visiteur).
+  2. LECTURE : téléchargement des fichiers depuis le stockage privé, contrôle
+     du vrai format (un faux PDF ou un faux Excel est refusé), extraction du
+     texte (CSV, XLSX, PDF ; PDF numérisés : OCR si disponible).
+  3. COMPRÉHENSION des fichiers (voir section 6) : type de chaque tableau et
+     totaux exacts calculés par le serveur.
+  4. ANONYMISATION : noms, NCC, RIB, e-mails et téléphones sont remplacés
+     avant tout envoi à l'IA.
+  5. EXTRACTION IA (OpenRouter, 3 modèles en repli automatique) : l'IA range
+     les montants dans 20 postes (compte de résultat et bilan) selon le plan
+     SYSCOHADA révisé. Elle ne calcule jamais rien. Les totaux du serveur lui
+     sont donnés comme repères et complètent ses champs vides. Si aucun modèle
+     ne répond mais que le serveur a calculé des totaux, le traitement continue
+     quand même (« calcul direct »).
+  6. CONTRÔLES : montants négatifs rejetés (sauf capitaux propres), seuil de
+     confiance par poste (0,60), équilibre du bilan, période de l'exercice.
+     Les fichiers bruts sont alors supprimés du stockage.
+  7. CALCUL : indicateurs et scores (section 7).
+  8. RAPPORT : rédaction en langage simple, rendu Word (4 pages), rangé dans le
+     stockage privé « rapports ».
+  9. ENVOI : e-mail au visiteur avec lien sécurisé 7 jours et rapport en pièce
+     jointe (si moins de 5 Mo), copie possible aux conseillers.
+
+ Issues possibles :
+   - ENVOYÉ : rapport produit et e-mail parti.
+   - Rapport prêt, e-mail en échec : le rapport reste disponible dans « Mes
+     diagnostics » ; un conseiller peut renvoyer l'e-mail.
+   - ERREUR : aucun montant exploitable, lecture trop incertaine ou incident
+     technique. Le visiteur voit la cause réelle et reçoit un e-mail d'excuse
+     adapté ; le dossier apparaît « Rappel à faire » chez les conseillers.
+   - Traitement interrompu (fonction arrêtée) : passé en erreur par la tâche
+     quotidienne, relançable par un conseiller.
+
+
+--------------------------------------------------------------------------------
+ 6. LA COMPRÉHENSION DES FICHIERS DÉPOSÉS
+--------------------------------------------------------------------------------
+ Principe : tous les visiteurs n'ont pas de balance ou de bilan. La plateforme
+ doit comprendre ce qu'on lui donne et en tirer le maximum, plutôt que refuser.
+
+ Reconnaissance de chaque tableau (en-têtes, nom du fichier et de la feuille,
+ numéros de compte) :
+   - Balance générale / grand livre : colonne de numéros de compte + débit,
+     crédit ou solde. Agrégation par comptes SYSCOHADA : 70 → chiffre
+     d'affaires, 601/603 → achats de marchandises, 602 → matières, 66 →
+     personnel, 61-65 → autres charges, 68-69 → dotations, 67 → charges
+     financières, 77 → produits financiers, 89 → impôt, classe 2 →
+     immobilisations, classe 3 → stocks, 41 → clients, 50-58 → trésorerie,
+     16-17 → dettes financières, 40 → fournisseurs, 42-44 → dettes fiscales et
+     sociales, 56 → découverts.
+   - Journal des ventes : somme de la colonne HT (sinon TTC ÷ 1,18, ou TTC si
+     TVA exonérée) → chiffre d'affaires.
+   - Journal des achats : même règle → achats de marchandises.
+   - Journal de paie : salaires bruts + charges patronales → charges de
+     personnel (à défaut : nets, signalés comme sous-estimés).
+ Règles de calcul :
+   - les lignes « TOTAL », « Sous-total », « Cumul », « Report » sont ignorées
+     (pas de double comptage) ;
+   - nombres lus dans tous les formats (1 234 567,89 · 1.234.567,89 · (1 000)) ;
+   - période déduite des dates. Si les fichiers couvrent plus de 13 mois, la
+     plateforme retient la dernière année civile complète (sinon presque
+     complète, sinon les 12 derniers mois) et calcule le chiffre d'affaires de
+     l'année précédente (N-1), ce qui permet de mesurer la croissance.
+ Ces totaux sont envoyés à l'IA dans une « synthèse calculée » (anonymisée) et
+ complètent sa sortie là où elle n'a rien trouvé de fiable.
+
+ Rapport partiel : si les documents ne couvrent qu'une partie de l'activité
+ (par exemple uniquement des journaux), le rapport est produit quand même,
+ porte la mention « Note indicative » et précise ce qui a pu être mesuré et ce
+ qui demande la balance ou le bilan.
+
+
+--------------------------------------------------------------------------------
+ 7. LA LOGIQUE DE CALCUL : INDICATEURS, SCORES, NOTES
+--------------------------------------------------------------------------------
+ 7.1 Indicateurs (moteur_rapport.py)
+   - Évolution du CA (N vs N-1), marge brute (CA − achats) et taux, EBE
+     (CA − achats − personnel − autres charges) et taux, résultat avant impôt,
+     résultat net et taux.
+   - Trésorerie nette (trésorerie actif − découverts), délai clients et délai
+     fournisseurs (en jours, sur montants TTC), BFR, masse salariale / CA,
+     endettement / capitaux propres, IMF théorique, IS théorique.
+   - Un indicateur dont une donnée manque n'est jamais calculé (« non évalué »).
+
+ 7.2 Score de santé financière (sur 100)
+   Chiffre d'affaires & croissance ......... 20 pts
+   Marge brute & EBE ....................... 20 pts
+   Résultat net ............................ 15 pts
+   Trésorerie & délais ..................... 20 pts
+   Masse salariale / CA .................... 10 pts
+   Endettement / capitaux propres .......... 15 pts
+   Données partielles : la note est ramenée sur les seuls points évaluables
+   (un poste manquant ne compte pas comme un mauvais résultat). Si moins de 60
+   points sont évaluables, la note est signalée « indicative ».
+
+ 7.3 Score de conformité (sur 100)
+   Déclarations fiscales DGI ............... 25 pts (à jour 25, retard 8)
+   Facture normalisée électronique FNE ..... 25 pts (active ou exemptée 25,
+                                             en cours 12, non activée 3)
+   Régime fiscal ........................... 25 pts (cohérent avec le CA 25,
+                                             plus lourd que nécessaire 18,
+                                             incohérent 5)
+   CNPS (15) + ITS, CMU, DISA (10) ......... 25 pts
+   Régime attendu selon le CA HT : ≤ 50 M TEE ; ≤ 200 M RME (réel simplifié
+   possible dès 100 M) ; ≤ 500 M réel simplifié ; au-delà réel normal.
+   Moins de 50 / 100 : risque de redressement signalé.
+
+ 7.4 Notes : A ≥ 80 (solide) · B ≥ 60 (saine) · C ≥ 40 (fragile) · D < 40
+     (critique).
+ 7.5 Alertes : classées critique / élevée / moyenne / info ; l'alerte de
+     conformité la plus grave devient « l'alerte principale ».
+
+
+--------------------------------------------------------------------------------
+ 8. LE PLAN D'ACTION ET LES MODULES DE LA SUITE FLOW
+--------------------------------------------------------------------------------
+ Jusqu'à 6 actions, triées par priorité (P1 urgent à P4) :
+   - FNE non activée → activer la FNE (sous 30 jours) · Flow Sell, Flow Compta
+   - CNPS / ITS / CMU / DISA en retard → régulariser (sous 30 jours) · Flow RH
+   - Trésorerie négative → plan de trésorerie à 13 semaines · Flow Compta
+   - Délai clients > 60 j → le ramener à 60 j (gain de trésorerie chiffré) ·
+     Flow Sell
+   - Délai fournisseurs < 45 j → négocier 45 j (gain chiffré) · Flow Compta
+   - Marge brute < 40 % → gagner 2 points (gain d'EBE chiffré) · Flow Sell
+   - Endettement > 50 % → stabiliser l'endettement · Flow Compta
+ Chaque action indique son impact, son délai et le module conseillé.
+
+
+--------------------------------------------------------------------------------
+ 9. LE RAPPORT WORD (4 PAGES)
+--------------------------------------------------------------------------------
+ Nom : Diagnostic_DC-KNOWING_JPO-2026-XXXX.docx — charte noir et or, logo,
+ graphiques, en-tête « Journées Portes Ouvertes · 16-18 décembre 2026 ».
+   Page 1 « Le diagnostic de votre entreprise » : les deux notes avec leur
+     phrase d'explication, « Notre avis en une phrase », « Ce qu'il faut
+     retenir », comment lire le rapport.
+   Page 2 « Votre santé financière, expliquée » : activité, rentabilité,
+     marge, salaires, résultat (vert / orange / rouge / gris = non évalué),
+     avec un conseil pour chacun.
+   Page 3 « Votre trésorerie et vos obligations » : trésorerie, délais,
+     tableau de conformité (DGI, FNE, régime, CNPS et social).
+   Page 4 « Votre plan d'action » : actions priorisées, impact, délai, module,
+     orientation à 12 mois.
+ Rédaction en langage simple, sans jargon. Version Markdown conservée pour que
+ les conseillers puissent corriger le texte (téléchargeable dans leur espace).
+
+
+--------------------------------------------------------------------------------
+ 10. LES E-MAILS ENVOYÉS
+--------------------------------------------------------------------------------
+ Expéditeur : DC-KNOWING · Diagnostic JPO <diagnostic@dc-knowing.com>
+ (Resend, domaine dc-knowing.com vérifié). Gabarit sobre aux couleurs de l'app.
+   - Code d'accès / confirmation d'adresse (Supabase Auth) : code à 6 chiffres
+     + lien de connexion.
+   - Changement d'adresse e-mail, réinitialisation (modèles prêts).
+   - « Votre diagnostic financier » : scores, verdict, bouton « Télécharger mon
+     rapport » (lien 7 jours), pièce jointe Word si < 5 Mo.
+   - « Un conseiller vous rappelle » : e-mail d'excuse en cas d'échec, avec la
+     cause (aucun montant exploitable, lecture incertaine, incident technique).
+   - « Votre invitation » : jour, horaire, entretien réservé, fichier agenda.
+ Modèles d'e-mails d'authentification : supabase/templates/.
+
+
+--------------------------------------------------------------------------------
+ 11. DONNÉES, SÉCURITÉ ET CONFIDENTIALITÉ
+--------------------------------------------------------------------------------
+   - Chaque visiteur ne voit que ses propres données : règles de sécurité au
+     niveau des lignes (RLS) sur toutes les tables, dossiers de stockage
+     séparés par utilisateur. Vérifié en production avec deux comptes.
+   - Seul le serveur peut écrire les statuts, scores et l'état « envoyé ».
+   - Fichiers bruts : supprimés après l'analyse (au plus tard 24 h).
+     Rapports : conservés 30 jours. Purge automatique chaque nuit.
+   - Données envoyées à l'IA : anonymisées (noms, NCC, RIB, e-mails,
+     téléphones remplacés).
+   - Téléchargements uniquement par liens signés à durée limitée (7 jours).
+   - Droit à l'effacement depuis « Mes diagnostics » (loi n°2013-450, ARTCI),
+     consentement obligatoire avant tout dépôt.
+   - Journal d'audit : dépôts, consultations et actions des conseillers.
+   - Clés secrètes uniquement côté serveur (Vercel et Supabase), jamais dans
+     le code ni dans le navigateur.
+
+
+--------------------------------------------------------------------------------
+ 12. ARCHITECTURE TECHNIQUE
+--------------------------------------------------------------------------------
+   Front (site visiteur + espace conseillers) : HTML/CSS/JavaScript (Preact),
+     sans étape de compilation — dossier checkup360-front/. Servi par Vercel.
+   API : Python FastAPI (backend/app), fonction Vercel (api/index.py),
+     région Dublin, 300 s maximum par traitement.
+   Rendu Word : fonction Node Vercel (api/docx.js → word/md_vers_word.js).
+   Base de données, comptes, fichiers : Supabase (projet hhzwzoantzhgtsbrtswr,
+     Irlande) — tables profiles, documents, rapports, entretiens, audit_logs,
+     compteurs ; stockages privés « documents » (20 Mo) et « rapports ».
+     Schéma versionné dans supabase/migrations/.
+   E-mails : Supabase Auth (SMTP Resend) + fonction Supabase
+     « envoyer-rapport » (API Resend).
+   IA : OpenRouter, modèles gratuits avec repli (variable OPENROUTER_MODELS).
+   Tâche planifiée : Vercel Cron, chaque nuit à 03:17 (purge, dossiers
+     bloqués).
+   Déploiement : automatique à chaque modification de la branche main.
+
+ Principaux fichiers :
+   backend/app/main.py ........ routes de l'API
+   backend/app/pipeline.py .... enchaînement du traitement
+   backend/app/comprehension.py reconnaissance des fichiers et totaux
+   backend/app/extraction.py .. consignes et contrôles de l'IA
+   backend/app/readers.py ..... lecture CSV, XLSX, PDF
+   moteur_rapport.py .......... indicateurs, scores, plan d'action
+   word/generer_rapport.py .... rédaction du rapport
+   word/md_vers_word.js ....... mise en page Word
+   supabase/functions/envoyer-rapport/index.ts ... e-mails
+   DEPLOIEMENT.md ............. guide de mise en ligne
+   backend/tests/ ............. 59 tests automatiques
+
+
+--------------------------------------------------------------------------------
+ 13. EXPLOITATION : RÉGLAGES, COMPTES, MAINTENANCE
+--------------------------------------------------------------------------------
+   Comptes conseillers : Vercel > projet jpo-checkup > Settings > Environment
+     Variables > ADMIN_ACCOUNTS (format email=motdepasse;email2=motdepasse2),
+     puis redéployer.
+   Clé IA, clé serveur Supabase, secrets : même écran Vercel.
+   Clé Resend : Supabase > Edge Functions > Secrets, et Authentication >
+     Emails > SMTP.
+   Adresses autorisées pour la connexion : Supabase > Authentication > URL
+     Configuration (à mettre à jour avec le domaine définitif).
+   Programme, créneaux, secteurs : assets/js/app-visiteur.js.
+   Réglages ajustables par variables : MAX_FILES (10), MAX_UPLOAD_MB (20),
+     RATE_LIMIT_PER_HOUR (5), EVENT_DAYS, ENTRETIEN_CAPACITE (1),
+     LLM_TIMEOUT, LLM_BUDGET, OPENROUTER_MODELS, MAIL_COPY_TO.
+   Suivi : journaux Vercel (fonctions) et Supabase (base, e-mails).
+
+
+--------------------------------------------------------------------------------
+ 14. LIMITES CONNUES ET POINTS OUVERTS
+--------------------------------------------------------------------------------
+   - Rapport en Word uniquement (pas de PDF : LibreOffice indisponible sur
+     Vercel) ; le contrôle « 4 pages exactement » n'est donc pas automatique.
+   - Modèles IA gratuits parfois indisponibles : prévoir un modèle payant en
+     secours pour l'événement (quelques centimes par rapport).
+   - Plans gratuits : Vercel Hobby interdit l'usage commercial (plan Pro
+     conseillé) ; Supabase gratuit se met en pause après 7 jours d'inactivité.
+   - Limite d'envoi d'e-mails de connexion à relever avant le jour J
+     (Supabase > Authentication > Rate Limits).
+   - Mot de passe des conseillers à renforcer.
+   - PDF numérisés (scans) : lecture par OCR non installée sur Vercel ; les
+     fichiers Excel ou CSV sont toujours préférables.
+   - Page d'accueil : la mention « rapport de 3 pages » est à remplacer par
+     « rapport Word de 4 pages ».
+   - Le QR code de l'invitation est décoratif ; la police « Journées »
+     (Amsterdam) est remplacée par une police de substitution.
+================================================================================
