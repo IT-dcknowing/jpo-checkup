@@ -29,7 +29,7 @@ class Component extends DCLogic {
         ['Vous', 'Vous et votre visite', 'Pour vous rappeler si besoin et préparer votre invitation au bon jour.'],
         ['Fiscalité', 'Votre fiscalité', 'Nous vérifions que votre régime correspond à votre chiffre d’affaires. « Je ne sais pas » est accepté.'],
         ['Obligations', 'Vos obligations déclaratives', 'Une réponse par ligne. Elles alimentent votre score de conformité.'],
-        ['Documents', 'Vos documents comptables', 'Un fichier par emplacement, 3 au maximum. La balance générale suffit souvent.'],
+        ['Documents', 'Vos documents comptables', 'Jusqu’à 10 fichiers. La balance générale suffit souvent ; à défaut, déposez tous vos journaux et relevés dans « Autres documents ».'],
         ['Vérification', 'Vérifiez et lancez', 'Un dernier coup d’œil avant l’analyse. Vous pouvez modifier chaque bloc.']
       ],
       SLOTS: ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'],
