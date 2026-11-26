@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
   if (type === "excuse") {
     const nonReconnu = body.motif === "non_reconnu";
     const raison = nonReconnu
-      ? "Les fichiers déposés ne contiennent pas les états financiers nécessaires au diagnostic : il se calcule à partir de la balance générale (idéal), du compte de résultat ou du bilan. Les journaux de ventes, d'achats ou de paie ne suffisent pas."
+      ? "Aucun montant comptable exploitable n'a été trouvé dans les fichiers déposés. Le diagnostic se calcule de préférence à partir de votre balance générale ; un journal de ventes, d'achats ou de paie permet aussi un premier diagnostic partiel."
       : body.motif === "technique"
         ? "Votre diagnostic n'a pas pu être produit automatiquement à la suite d'un incident technique."
         : "Nous vous prions de nous excuser : les documents déposés n'ont pas pu être lus de façon assez fiable pour produire un rapport automatique.";

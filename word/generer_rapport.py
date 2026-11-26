@@ -90,6 +90,9 @@ def page1(e, k, perf, conf, nonconf, compact):
                 "C": "**Fragile.** " + ("Vos ventes progressent, mais l'entreprise" if (k["evol"] or 0) > 0 else "L'entreprise")
                      + " gagne peu" + (" et manque de trésorerie." if (k["tn"] or 0) < 0 else "."),
                 "D": "**Critique.** L'entreprise perd de l'argent ou n'a plus de marge de sécurité."}[perf["grade"]]
+    if perf.get("indicatif"):
+        phr_perf = (f"**Note indicative.** Calculée sur {perf['couverture']} des 100 points : vos documents ne couvrent pas "
+                    "toute votre activité. Les indicateurs gris de la page 2 n'ont pas pu être évalués.")
     n = len(nonconf)
     phr_conf = ("**Exemplaire.** Toutes vos obligations sont à jour." if n == 0 else
                 f"**{'Correcte' if conf['score'] >= 60 else 'Insuffisante'}.** "
@@ -102,15 +105,25 @@ def page1(e, k, perf, conf, nonconf, compact):
         morceaux.append("Votre entreprise a une activité solide qui grandit")
     else:
         morceaux.append("Votre entreprise a une base de clients réelle")
-    if (k["rn_pct"] or 0) < 5:
-        morceaux.append("elle travaille beaucoup pour un bénéfice faible" if (k["rn_pct"] or 0) >= 0 else "elle perd aujourd'hui de l'argent")
+    if k["rn_pct"] is not None and k["rn_pct"] < 5:
+        morceaux.append("elle travaille beaucoup pour un bénéfice faible" if k["rn_pct"] >= 0 else "elle perd aujourd'hui de l'argent")
     if (k["tn"] or 0) < 0:
         morceaux.append("vit sur son découvert bancaire")
     avis = morceaux[0] + (", mais " + " et ".join(morceaux[1:]) if len(morceaux) > 1 else "") + "."
+    if perf.get("indicatif"):
+        avis += " Ce premier avis repose sur des documents partiels : avec votre balance générale, nous pourrons le compléter."
     avis += (" Les problèmes ont des causes claires et se corrigent : le plan d'action de la page 4 vous montre par où commencer."
              if perf["grade"] in "CD" or n else " Le plan d'action de la page 4 vous aide à consolider ces acquis.")
 
     retenir = []
+    if perf.get("indicatif"):
+        mesure = [f"chiffre d'affaires de **{millions(k['ca'])}**" if k["ca"] else None,
+                  f"marge brute de **{M.fr_num(k['mb_pct'], 1)} %**" if k["mb_pct"] is not None else None,
+                  f"masse salariale égale à **{M.fr_num(k['masse'], 1)} %** du chiffre d'affaires" if k["masse"] is not None else None]
+        mesure = [x for x in mesure if x]
+        if mesure:
+            retenir.append("**Ce que vos documents permettent de mesurer :** " + ", ".join(mesure)
+                           + ". Le reste (bénéfice, trésorerie, dettes) demande votre balance générale ou votre bilan.")
     if k["evol"] is not None:
         retenir.append(f"**Votre activité grandit.** Vous avez vendu davantage qu'en {int(k['_annee']) - 1} : vos clients vous font confiance, c'est votre principal atout."
                        if k["evol"] > 0 else "**Votre activité recule.** Vous avez vendu moins que l'année précédente : il faut comprendre quels clients ou produits ont baissé.")

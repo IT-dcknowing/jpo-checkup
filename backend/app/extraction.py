@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from .llm import LLMClient
+from .llm import LLMError, LLMClient
 from .readers import fit_budget
 from .schemas import ACTIF_FIELDS, CR_FIELDS, ND, PASSIF_FIELDS, DepotForm, IAOutput
 
@@ -130,7 +130,42 @@ def finalize(out: IAOutput, form: DepotForm, modele: str, extra_warnings: list[s
                       warnings=warnings, modele=modele)
 
 
-def extract(llm: LLMClient, form: DepotForm, text: str, max_chars: int = 60_000) -> Extraction:
-    """Appelle l'IA (avec repli entre modèles) puis valide et contrôle sa sortie."""
-    out, modele = llm.complete_validated(SYSTEM_PROMPT, build_user_context(form, text, max_chars), IAOutput.model_validate)
+def completer(ia: dict, comp) -> list[str]:
+    """Complète la sortie de l'IA avec les totaux calculés par le serveur (comprehension.py) là où elle n'a rien trouvé
+    de fiable. Retourne la liste des postes complétés."""
+    faits = []
+    for (zone, champ), f in comp.faits.items():
+        bloc = ia["compte_resultat"] if zone == "compte_resultat" else ia["bilan"][zone]
+        node = bloc.get(champ)
+        if node is None:
+            continue
+        if node["valeur"] == ND or node["confiance"] < CONF_MIN:
+            bloc[champ] = {"valeur": float(round(f.valeur)), "confiance": f.confiance, "sources": f.source[:300]}
+            faits.append(champ)
+    meta = ia["meta"]
+    if comp.debut and comp.fin and not (_is_date(meta["period_start"]) and _is_date(meta["period_end"])):
+        meta["period_start"], meta["period_end"] = comp.debut.isoformat(), comp.fin.isoformat()
+    if faits:
+        meta["confidence_global"] = None  # recalculée sur les postes réellement lus
+        meta["warnings"] = list(meta.get("warnings") or []) + [f"calculé par le serveur à partir des fichiers : {', '.join(faits)}"] \
+            + list(comp.avertissements)
+    return faits
+
+
+def extract(llm: LLMClient, form: DepotForm, text: str, max_chars: int = 60_000, comp=None) -> Extraction:
+    """Appelle l'IA (avec repli entre modèles), complète avec les totaux calculés, puis valide et contrôle."""
+    synthese = comp.resume_texte() if comp else ""
+    contexte = build_user_context(form, text, max(max_chars - len(synthese), 10_000))
+    if synthese:  # la synthèse n'est jamais tronquée : elle passe avant le texte brut
+        contexte = contexte.replace("TEXTE_BRUT_DU_DOCUMENT:\n", f"{synthese}\n\nTEXTE_BRUT_DU_DOCUMENT:\n", 1)
+    try:
+        out, modele = llm.complete_validated(SYSTEM_PROMPT, contexte, IAOutput.model_validate)
+    except LLMError:
+        if not (comp and comp.faits):
+            raise
+        out, modele = IAOutput.model_validate({"compte_resultat": {}, "bilan": {}}), "calcul direct (IA indisponible)"
+    if comp and comp.faits:
+        ia = out.model_dump()
+        if completer(ia, comp):
+            out = IAOutput.model_validate(ia)
     return finalize(out, form, modele)

@@ -22,7 +22,7 @@ class Component extends DCLogic {
       FNE: [['ACTIVE', 'Activée'], ['EN_COURS_ACTIVATION', 'Activation en cours'], ['NON_ACTIVE', 'Non activée'], ['NE_SAIT_PAS', 'Je ne sais pas']],
       STAT: [['A_JOUR', 'À jour'], ['EN_RETARD', 'En retard'], ['NE_SAIT_PAS', 'Ne sait pas']],
       OBL: [['DGI', 'Déclarations fiscales'], ['CNPS', 'Cotisations sociales'], ['ITS', 'Impôt sur traitements et salaires'], ['CMU', 'Couverture maladie universelle'], ['DISA', 'Déclaration individuelle des salaires annuels']],
-      DOCS: [['balance', 'Balance générale', 'Le plus complet : il suffit souvent à lui seul.', true], ['cr', 'Compte de résultat', 'Chiffre d’affaires, achats, charges et résultat.', false], ['bilan', 'Bilan', 'Actif, passif, trésorerie et dettes.', false], ['autre', 'Autre document', 'Complément facultatif (déclarations, grand livre) : ne remplace pas la balance.', false]],
+      DOCS: [['balance', 'Balance générale', 'Le plus complet : il suffit souvent à lui seul.', true], ['cr', 'Compte de résultat', 'Chiffre d’affaires, achats, charges et résultat.', false], ['bilan', 'Bilan', 'Actif, passif, trésorerie et dettes.', false], ['autre', 'Autre document', 'Journal de ventes, d’achats ou de paie, grand livre : diagnostic partiel.', false]],
       STEPS: [
         ['Entreprise', 'Votre entreprise', 'Ces informations identifient le dossier et choisissent les repères adaptés à votre secteur.'],
         ['Vous', 'Vous et votre visite', 'Pour vous rappeler si besoin et préparer votre invitation au bon jour.'],

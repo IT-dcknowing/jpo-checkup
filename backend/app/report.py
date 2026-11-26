@@ -71,7 +71,7 @@ def compute(settings: Settings, data: dict) -> dict:
         grade_conformite=conf["grade"], couverture_pct=round(ok / len(champs) * 100),
         points_evaluables=perf["couverture"], score_indicatif=perf["indicatif"],
         alertes=alertes, risque_redressement=conf["risque_redressement"],
-        resume=dict(verdict=VERDICT[perf["grade"]], points_forts=list(dict.fromkeys(forts))[:4],
+        resume=dict(verdict=("Note indicative (documents partiels) : " if perf["indicatif"] else "") + VERDICT[perf["grade"]], points_forts=list(dict.fromkeys(forts))[:4],
                     points_a_traiter=list(dict.fromkeys(a_traiter))[:5], alerte_principale=principale.split(" : ")[0].rstrip("."),
                     indicatif=perf["indicatif"]),
     )

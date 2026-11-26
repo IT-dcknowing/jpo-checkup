@@ -12,6 +12,7 @@ from conftest import FORM, FakeLLM
 from fake_supabase import FakeSupabase
 
 CSV = "compte;libelle;solde\n701;Ventes;125000000\n601;Achats;82000000\n".encode("utf-8")
+SANS_CHIFFRES = "nom;ville;observations\nDupont;Abidjan;rien\nKone;Bouake;neant\n".encode("utf-8")  # aucune donnée comptable
 ADMIN = {"email": "conseiller@dc-knowing.ci", "password": "mot-de-passe-test"}
 
 
@@ -147,7 +148,7 @@ def test_ia_failure_gives_error_and_apology(settings):
     with TestClient(create_app(settings, llm=FakeLLM(error=LLMError("tous les modèles ont échoué")), sb=sb)) as c:
         c.sb = sb
         tok = sb.add_user("x@exemple.ci")
-        job_id = depot(c, tok).json()["job_id"]
+        job_id = depot(c, tok, docs=[{"id": deposer_fichier(sb, tok, data=SANS_CHIFFRES), "type": "autre"}]).json()["job_id"]
         v = traiter(c, tok, job_id)
         assert v["statut"] == "ERREUR" and "conseiller" in v["message"]
         assert sb.tables["rapports"][0]["statut"] == "erreur"
@@ -231,9 +232,9 @@ def test_documents_without_financial_statements_get_a_clear_message(settings):
     with TestClient(create_app(settings, llm=FakeLLM(payload=vide), sb=sb)) as c:
         c.sb = sb
         tok = sb.add_user("x@exemple.ci")
-        job_id = depot(c, tok).json()["job_id"]
+        job_id = depot(c, tok, docs=[{"id": deposer_fichier(sb, tok, data=SANS_CHIFFRES), "type": "autre"}]).json()["job_id"]
         v = traiter(c, tok, job_id)
-        assert v["statut"] == "ERREUR" and "balance générale" in v["message"] and "journaux" in v["message"]
+        assert v["statut"] == "ERREUR" and "balance générale" in v["message"]
         assert sb.tables["rapports"][0]["erreur"].startswith("documents non reconnus")
         assert any(b.get("motif") == "non_reconnu" for _, b, _ in sb.invocations)
         j = c.get(f"/api/diagnostics/{job_id}/journal", headers=auth(tok)).json()

@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 from . import report
+from .comprehension import comprendre
 from .anonymize import anonymize
 from .config import Settings
 from .db import TERMINAUX, Database, now_iso
@@ -24,9 +25,9 @@ FRONT_ETAPE = {"EN_ATTENTE": "EN_ATTENTE", "LECTURE": "LECTURE", "MAPPING_IA": "
                "ENVOYE": "ENVOYE", "TERMINE": "ENVOYE", "ERREUR": "ERREUR"}
 TYPES_FICHIERS = {"balance": "balance générale", "cr": "compte de résultat", "bilan": "bilan", "autre": "autre document"}
 MSG_PUBLIC_LECTURE = "Rapport automatique annulé : vos documents n'ont pas pu être lus de façon fiable. Un conseiller DC-KNOWING vous rappelle pour réaliser votre diagnostic avec vous."
-MSG_PUBLIC_NON_RECONNU = ("Vos fichiers ne contiennent pas les états financiers attendus : le diagnostic se calcule à partir de la balance générale "
-                          "(idéal), du compte de résultat ou du bilan. Les journaux (ventes, achats, paie) ne suffisent pas. "
-                          "Déposez ces documents ou un conseiller DC-KNOWING vous rappelle pour le faire avec vous.")
+MSG_PUBLIC_NON_RECONNU = ("Aucun montant comptable exploitable n'a été trouvé dans vos fichiers (ventes, achats, salaires, comptes). "
+                          "Déposez de préférence votre balance générale, ou un journal de ventes, d'achats ou de paie ; "
+                          "un conseiller DC-KNOWING peut aussi vous rappeler pour le faire avec vous.")
 MSG_PUBLIC_TECH = "Votre diagnostic n'a pas pu être produit automatiquement. Un conseiller DC-KNOWING vous rappelle très vite."
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 EXT_LECTURE = {".csv", ".xlsx", ".pdf"}
@@ -129,6 +130,7 @@ class Pipeline:
         fichiers = self.db.job_documents(job_id)
         self._log(job_id, "LECTURE", 3, f"Fichiers reçus : {len(fichiers)} document{'s' if len(fichiers) > 1 else ''}")
         textes, avertissements, genres = [], [], []
+        locaux: list[tuple[str, Path]] = []
         with tempfile.TemporaryDirectory(prefix="jpo-") as tmp:
             for i, f in enumerate(fichiers):
                 ext = Path(f["nom_fichier"]).suffix.lower()
@@ -140,6 +142,7 @@ class Pipeline:
                     raise ReaderError(f"fichier « {f['nom_fichier']} » introuvable (supprimé après 24 h)") from e
                 path = Path(tmp) / f"{i}{ext}"
                 path.write_bytes(data)
+                locaux.append((f["nom_fichier"], path))
                 try:
                     r = read_file(path)
                 except ReaderError as e:
@@ -148,12 +151,24 @@ class Pipeline:
                 genres.append(r.kind.upper())
                 nature = TYPES_FICHIERS.get(f.get("categorie", ""), "document")
                 textes.append(f"=== FICHIER {i + 1} ({r.kind.upper()} · {nature}) ===\n{anonymize(r.text, form)}")
+            comp = comprendre(locaux, form.tva_exoneree)  # type de chaque tableau et totaux exacts
+        comp.documents = [anonymize(d, form) for d in comp.documents]  # noms de fichiers : peuvent contenir la raison sociale
+        comp.avertissements = [anonymize(a, form) for a in comp.avertissements]
+        for fait in comp.faits.values():
+            fait.source = anonymize(fait.source, form)
         self._log(job_id, "LECTURE", 17, f"Texte extrait ({', '.join(genres)})")
+        if comp.documents:
+            types = sorted({d.split(" : ", 1)[1].split(" (")[0] for d in comp.documents})
+            self._log(job_id, "LECTURE", 20, f"Documents reconnus : {', '.join(types)}")
+        if comp.faits:
+            self._log(job_id, "LECTURE", 22, f"Totaux calculés sur vos fichiers : {len(comp.faits)} poste{'s' if len(comp.faits) > 1 else ''}")
         self._log(job_id, "MAPPING_IA", 24, "Anonymisation : noms, NCC, RIB et téléphones remplacés")
-        ext_: Extraction = extract(self.llm, form, "\n\n".join(textes), self.s.context_max_chars)
+        ext_: Extraction = extract(self.llm, form, "\n\n".join(textes), self.s.context_max_chars, comp)
         ext_.ia["meta"]["warnings"] += avertissements
         self._log(job_id, "MAPPING_IA", 40, f"Extraction IA : confiance globale {fr_conf(ext_.confiance_globale)}")
         self._log(job_id, "MAPPING_IA", 43, f"Contrôles de cohérence terminés · données exploitées {ext_.couverture_pct} %")
+        if ext_.couverture_pct < 60:
+            self._log(job_id, "MAPPING_IA", 45, "Documents partiels : le rapport porte sur les parties disponibles (note indicative)")
         saved = {"ia": ext_.ia, "couverture_pct": ext_.couverture_pct, "confiance": ext_.confiance_globale,
                  "partielle": ext_.lecture_partielle, "modele": ext_.modele}
         self.db.update_job(job_id, resultat_ia=saved, lecture_partielle=bool(ext_.lecture_partielle), modele_ia=ext_.modele)
