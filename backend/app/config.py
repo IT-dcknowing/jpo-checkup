@@ -16,6 +16,8 @@ load_dotenv(PROJECT_DIR / ".env")
 load_dotenv(BACKEND_DIR / ".env")
 
 # Ordre de repli : si le premier modèle échoue, on passe au suivant.
+# Modèles gratuits (« :free ») : développement uniquement. OpenRouter n'y accepte que la collecte des données
+# (« data_collection=allow ») ; ils sont donc refusés en production (voir Settings.problemes_ia).
 DEFAULT_MODELS = [
     "nvidia/nemotron-3.5-lightning:free",
     "baidu/ernie-5.5-flash-preview:free",
@@ -105,23 +107,31 @@ class Settings:
         self.openrouter_api_key = e("OPENROUTER_API_KEY", "").strip()
         self.openrouter_url = e("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions")
         self.llm_models = _csv("OPENROUTER_MODELS", DEFAULT_MODELS)
-        self.llm_timeout = _float("LLM_TIMEOUT", 120)
-        # Budget total de l'étape IA (s) : la fonction Vercel s'arrête à 300 s, on garde de la marge pour le rendu
-        self.llm_budget = _float("LLM_BUDGET", 0)
+        self.llm_timeout = _float("LLM_TIMEOUT", 75)
+        # Budget total de l'étape IA (s) : la fonction Vercel s'arrête à 300 s, on garde de la marge pour le rendu.
+        # 0 = illimité (déconseillé : la fonction serait coupée sans message clair).
+        self.llm_budget = _float("LLM_BUDGET", 170)
         self.llm_backoff = [float(x) for x in _csv("LLM_BACKOFF", ["2", "6", "18"])]
         self.llm_max_tokens = _int("LLM_MAX_TOKENS", 8000)
-        # Les modèles gratuits exigent d'accepter la collecte ; le texte envoyé est anonymisé.
-        self.llm_data_collection = e("OPENROUTER_DATA_COLLECTION", "allow")
+        # « deny » : OpenRouter n'utilise que des fournisseurs qui ne conservent pas les données (notice ARTCI).
+        self.llm_data_collection = e("OPENROUTER_DATA_COLLECTION", "deny").strip().lower()
         self.context_max_chars = _int("CONTEXT_MAX_CHARS", 60_000)
 
         # Dépôts
         self.max_upload_bytes = _int("MAX_UPLOAD_MB", 20) * 1024 * 1024
         self.max_files = _int("MAX_FILES", 10)
+        self.max_total_bytes = _int("MAX_TOTAL_MB", 50) * 1024 * 1024        # par dépôt (tous fichiers)
+        self.max_user_bytes_day = _int("MAX_USER_MB_JOUR", 200) * 1024 * 1024  # par visiteur et par 24 h
+        self.max_files_hour = _int("MAX_FICHIERS_HEURE", 30)                   # autorisations d'envoi par visiteur et par heure
         self.rate_limit = _int("RATE_LIMIT_PER_HOUR", 5)
         self.event_days = _csv("EVENT_DAYS", DEFAULT_EVENT_DAYS)
         self.workers = _int("WORKERS", 4)
 
-        # Application : « dev » affiche les codes de connexion dans la console quand SMTP n'est pas configuré
+        # Environnement Vercel : production | preview | development (vide en local)
+        self.vercel_env = e("VERCEL_ENV", "").strip().lower()
+        self.production = self.vercel_env == "production"
+        # Préversions : pas d'e-mail réel tant que EMAILS_PREVIEW n'est pas à 1 (les préversions doivent viser un Supabase de test)
+        self.emails_actifs = self.vercel_env != "preview" or e("EMAILS_PREVIEW", "0") == "1"
         self.app_env = e("APP_ENV", "production").lower()
         self.front_dir = _find_front(e("FRONT_DIR", "").strip())
 
@@ -139,17 +149,33 @@ class Settings:
         self.event_location = e("EVENT_LOCATION", "Siège du Cabinet DC KNOWING, Cocody Riviera 2, Collège André Malraux, Abidjan")
 
         # Sécurité
-        # SECRET_KEY : signe les jetons conseillers et protège le service de rendu Word (obligatoire en production)
-        self.secret_key = e("SECRET_KEY", "").strip() or _persisted(self.data_dir / ".secret_key", lambda: secrets.token_urlsafe(48))
-        # Comptes conseillers : ADMIN_USER / ADMIN_PASSWORD, plus ADMIN_ACCOUNTS="a@x.ci=mdp1;b@x.ci=mdp2"
-        self.admin_accounts: dict[str, str] = {}
+        # SECRET_KEY : signe les jetons conseillers et protège le service de rendu Word (obligatoire en production :
+        # pas de secret généré en repli, il serait différent d'une instance Vercel à l'autre)
+        self.secret_key = e("SECRET_KEY", "").strip()
+        if not self.secret_key and not self.production:
+            self.secret_key = _persisted(self.data_dir / ".secret_key", lambda: secrets.token_urlsafe(48))
+        # Comptes conseillers : ADMIN_ACCOUNTS="a@x.ci=<empreinte>,totp=<clé base32>,role=lecture;b@x.ci=<empreinte>"
+        # <empreinte> : python -m app.security hash (scrypt). Les mots de passe en clair ne sont acceptés qu'hors production.
+        # Rôles : « conseiller » (défaut, toutes les actions) ou « lecture » (consultation seule, ni export ni envoi).
+        self.admin_accounts: dict[str, dict] = {}
         if e("ADMIN_PASSWORD"):
-            self.admin_accounts[e("ADMIN_USER", "conseiller").strip().lower()] = e("ADMIN_PASSWORD")
+            self.admin_accounts[e("ADMIN_USER", "conseiller").strip().lower()] = {"secret": e("ADMIN_PASSWORD"), "totp": "", "role": "conseiller"}
         for pair in e("ADMIN_ACCOUNTS", "").split(";"):
-            user, sep, pwd = pair.partition("=")
-            if sep and user.strip() and pwd:
-                self.admin_accounts[user.strip().lower()] = pwd
-        self.admin_token_ttl = _int("ADMIN_TOKEN_HOURS", 10) * 3600
+            user, sep, rest = pair.partition("=")
+            if not (sep and user.strip() and rest):
+                continue
+            secret, *opts = rest.split(",")
+            o = dict(x.split("=", 1) for x in opts if "=" in x)
+            role = o.get("role", "conseiller").strip().lower()
+            self.admin_accounts[user.strip().lower()] = {"secret": secret.strip(), "totp": o.get("totp", "").strip().replace(" ", "").upper(),
+                                                         "role": role if role in ("conseiller", "lecture") else "lecture"}
+        self.admin_token_ttl = _int("ADMIN_TOKEN_HOURS", 4) * 3600
+        # Changer ADMIN_TOKEN_VERSION révoque d'un coup tous les jetons conseillers en cours
+        self.admin_token_version = e("ADMIN_TOKEN_VERSION", "1").strip()
+        # Secret partagé API -> Edge Function envoyer-rapport (identifie le serveur sans tester la clé service_role)
+        self.internal_secret = e("EDGE_INTERNAL_SECRET", "").strip()
+        self.sentry_dsn = e("SENTRY_DSN", "").strip()
+        self.audit_retention_days = _int("RETENTION_AUDIT_DAYS", 365)
         self.download_ttl = _int("DOWNLOAD_TTL_DAYS", 7) * 86400
         self.cors_origins = _csv("CORS_ORIGINS", ["http://localhost:5173", "http://localhost:3000"])
         self.on_vercel = bool(e("VERCEL"))
@@ -169,6 +195,29 @@ class Settings:
         # Un profil LibreOffice par worker, réutilisé : 1re conversion ~45 s, les suivantes ~7 s.
         self.lo_profile_dir = Path(e("LO_PROFILE_DIR") or self.data_dir / "lo_profiles").resolve()
         self.lo_warmup = e("LO_WARMUP", "1") == "1"
+
+    def problemes_ia(self) -> list[str]:
+        """Réglages IA incompatibles avec la notice (« sans collecte ») : bloquants en production."""
+        out = []
+        if self.llm_data_collection != "deny":
+            out.append("OPENROUTER_DATA_COLLECTION doit valoir « deny »")
+        gratuits = [m for m in self.llm_models if m.endswith(":free")]
+        if gratuits:
+            out.append("modèles gratuits (collecte imposée) : " + ", ".join(gratuits))
+        return out
+
+    def problemes_config(self) -> list[str]:
+        """Secrets et réglages indispensables en production (l'API refuse de démarrer sans eux)."""
+        out = []
+        if len(self.secret_key) < 48:
+            out.append("SECRET_KEY absente ou trop courte (48 caractères minimum)")
+        if len(self.cron_secret) < 16:
+            out.append("CRON_SECRET absent ou trop court (16 caractères minimum) : la purge quotidienne serait refusée")
+        if not (self.supabase_url and self.supabase_service_key):
+            out.append("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY absentes")
+        if not self.openrouter_api_key:
+            out.append("OPENROUTER_API_KEY absente")
+        return out
 
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.uploads_dir, self.reports_dir):

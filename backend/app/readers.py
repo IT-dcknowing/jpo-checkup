@@ -84,13 +84,34 @@ def read_csv(path: Path) -> ReadResult:
     return ReadResult("\n".join(lines), "csv", [f"encodage détecté : {enc}"] if enc.lower() not in ("utf-8", "utf-8-sig") else [])
 
 
+MAX_SHEETS = 30
+MAX_XLSX_UNCOMPRESSED = 300 * 1024 * 1024  # protection contre les « bombes » de décompression
+
+
+def _check_zip(path: Path) -> None:
+    import zipfile
+    try:
+        with zipfile.ZipFile(path) as z:
+            infos = z.infolist()
+            if any(i.flag_bits & 0x1 for i in infos):
+                raise ReaderError("classeur Excel chiffré ou protégé par mot de passe : exportez-le sans protection")
+            if sum(i.file_size for i in infos) > MAX_XLSX_UNCOMPRESSED:
+                raise ReaderError("classeur Excel anormalement volumineux une fois décompressé")
+    except zipfile.BadZipFile as e:
+        raise ReaderError("le fichier n'est pas un vrai classeur Excel (.xlsx)") from e
+
+
 def read_xlsx(path: Path) -> ReadResult:
     from openpyxl import load_workbook
+    _check_zip(path)
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
     except Exception as e:
         raise ReaderError(f"classeur Excel illisible ({type(e).__name__})") from e
     blocks = []
+    if len(wb.worksheets) > MAX_SHEETS:
+        wb.close()
+        raise ReaderError(f"classeur de plus de {MAX_SHEETS} feuilles : déposez seulement les états utiles")
     for ws in wb.worksheets:
         lines = _rows_to_lines(row for _, row in zip(range(MAX_ROWS_PER_SHEET), ws.iter_rows(values_only=True)))
         if lines:

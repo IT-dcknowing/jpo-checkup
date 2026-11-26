@@ -5,9 +5,9 @@ Un « job » est une ligne de public.rapports, renvoyée sous la forme d'un dict
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from .supa import Supabase
+from .supa import Supabase, SupabaseError
 
 TERMINAUX = ("ENVOYE", "TERMINE", "ERREUR")
 
@@ -25,8 +25,20 @@ DONNEES = ("resultat_ia", "alertes", "plan_action", "resume")
 STATUT_GLOBAL = {"ERREUR": "erreur", "ENVOYE": "envoye", "TERMINE": "genere"}
 
 
+class QuotaDepasse(Exception):
+    """Trop de dépôts sur l'heure écoulée."""
+
+
+class DocumentsIndisponibles(Exception):
+    """Documents introuvables, d'un autre compte, ou déjà rattachés à un dossier (y compris par une requête simultanée)."""
+
+
+def _ids(values: list[str]) -> str:
+    return f"in.({','.join(values)})"
+
+
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _job(row: dict) -> dict:
@@ -56,12 +68,23 @@ class Database:
         return None
 
     # ------------------------------------------------------------------ rapports
-    def create_job(self, user_id: str, email: str, form: dict, jour: str, secteur: str, titre_entreprise: str) -> dict:
-        ref = self.sb.rpc("prochaine_reference", {"p_annee": jour[:4]})
-        row = self.sb.insert("rapports", {
-            "user_id": user_id, "email": email, "reference": ref, "titre": f"Diagnostic {ref} — {titre_entreprise}"[:200],
-            "jour_evenement": jour, "secteur": secteur, "formulaire": form,
-        })[0]
+    def create_job(self, user_id: str, email: str, form: dict, jour: str, secteur: str, titre_entreprise: str,
+                   documents: list[str], categories: dict[str, str], limite_heure: int) -> dict:
+        """Crée le dossier et y rattache les documents en une seule transaction (fonction SQL creer_rapport) :
+        quota horaire vérifié sous verrou, documents rattachés seulement s'ils sont libres. Lève QuotaDepasse ou
+        DocumentsIndisponibles."""
+        try:
+            rows = self.sb.rpc("creer_rapport", {
+                "p_user": user_id, "p_email": email, "p_jour": jour, "p_secteur": secteur, "p_formulaire": form,
+                "p_titre_entreprise": titre_entreprise[:150], "p_documents": documents, "p_categories": categories,
+                "p_limite_heure": limite_heure})
+        except SupabaseError as e:
+            if "QUOTA_DEPOTS" in str(e):
+                raise QuotaDepasse() from e
+            if "DOCUMENTS_INDISPONIBLES" in str(e):
+                raise DocumentsIndisponibles() from e
+            raise
+        row = rows[0] if isinstance(rows, list) else rows
         return _job(row)
 
     def get_job(self, job_id: str) -> dict | None:
@@ -79,11 +102,10 @@ class Database:
                     values["statut"] = STATUT_GLOBAL.get(v, "en_attente")
             else:
                 raise ValueError(f"colonne inconnue : {k}")
-        if donnees:  # fusion dans la colonne JSON (lecture puis écriture : un seul traitement à la fois par rapport)
-            cur = self.sb.select_one("rapports", {"id": f"eq.{job_id}", "select": "donnees"}) or {}
-            values["donnees"] = (cur.get("donnees") or {}) | donnees
         if values:
             self.sb.update("rapports", {"id": f"eq.{job_id}"}, values)
+        if donnees:  # fusion atomique côté base (donnees = donnees || patch) : aucun écrivain ne peut effacer les clés d'un autre
+            self.sb.rpc("fusionner_donnees", {"p_id": job_id, "p_patch": donnees})
 
     def list_jobs(self, jour: str | None = None, statut: str | None = None, owner: str | None = None, limit: int = 500) -> list[dict]:
         params = {"select": "*", "order": "created_at.desc", "limit": str(limit)}
@@ -96,16 +118,33 @@ class Database:
         return [_job(r) for r in self.sb.select("rapports", params)]
 
     def count_recent(self, owner: str, hours: int = 1) -> int:
-        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+        since = (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
         return len(self.sb.select("rapports", {"select": "id", "user_id": f"eq.{owner}", "created_at": f"gte.{since}"}))
 
-    def jobs_older_than(self, delta: timedelta) -> list[dict]:
-        limite = (datetime.now(timezone.utc) - delta).isoformat()
-        return [_job(r) for r in self.sb.select("rapports", {"select": "*", "created_at": f"lt.{limite}"})]
+    def old_jobs_batch(self, delta: timedelta, batch: int = 200) -> list[dict]:
+        """Lot de dossiers plus anciens que `delta` (colonnes utiles à la purge seulement), du plus ancien au plus récent.
+        Appelé en boucle par la purge, qui supprime chaque lot : aucune dépendance à la limite max_rows de PostgREST."""
+        limite = (datetime.now(UTC) - delta).isoformat()
+        return self.sb.select("rapports", {"select": "id,chemin_fichier,chemin_markdown", "created_at": f"lt.{limite}",
+                                           "order": "created_at.asc", "limit": str(batch)})
+
+    def delete_jobs(self, ids: list[str]) -> None:
+        if ids:
+            self.sb.delete("rapports", {"id": _ids(ids)})
+
+    def is_stale(self, job: dict, bail_seconds: int = 360, attente_minutes: int = 10) -> bool:
+        """Traitement interrompu : verrou expiré sans fin de traitement, ou dossier jamais lancé depuis `attente_minutes`."""
+        if job["statut"] in TERMINAUX:
+            return False
+        now = datetime.now(UTC)
+        depuis = job.get("traitement_depuis")
+        if depuis:
+            return datetime.fromisoformat(str(depuis).replace("Z", "+00:00")) < now - timedelta(seconds=bail_seconds)
+        return datetime.fromisoformat(str(job["created_at"]).replace("Z", "+00:00")) < now - timedelta(minutes=attente_minutes)
 
     def stale_jobs(self, minutes: int) -> list[dict]:
         """Traitements interrompus (fonction arrêtée) : non terminés et sans activité depuis `minutes`."""
-        limite = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+        limite = (datetime.now(UTC) - timedelta(minutes=minutes)).isoformat()
         rows = self.sb.select("rapports", {"select": "*", "etape": "not.in.(TERMINE,ENVOYE,ERREUR)", "created_at": f"lt.{limite}"})
         return [_job(r) for r in rows if not r.get("traitement_depuis") or r["traitement_depuis"] < limite]
 
@@ -126,19 +165,21 @@ class Database:
         order = {i: n for n, i in enumerate(ids)}
         return sorted(rows, key=lambda r: order.get(r["id"], 99))
 
-    def attach_documents(self, job_id: str, ids: list[str]) -> None:
-        self.sb.update("documents", {"id": f"in.({','.join(ids)})"}, {"rapport_id": job_id})
+    def create_documents(self, rows: list[dict]) -> list[dict]:
+        return self.sb.insert("documents", rows) if rows else []
 
     def job_documents(self, job_id: str) -> list[dict]:
         return self.sb.select("documents", {"select": "*", "rapport_id": f"eq.{job_id}", "order": "created_at.asc"})
 
-    def documents_older_than(self, delta: timedelta) -> list[dict]:
-        limite = (datetime.now(timezone.utc) - delta).isoformat()
-        return self.sb.select("documents", {"select": "id,chemin", "created_at": f"lt.{limite}"})
+    def old_documents_batch(self, delta: timedelta, batch: int = 500) -> list[dict]:
+        """Lot de documents plus anciens que `delta`, du plus ancien au plus récent (la purge supprime chaque lot)."""
+        limite = (datetime.now(UTC) - delta).isoformat()
+        return self.sb.select("documents", {"select": "id,chemin", "created_at": f"lt.{limite}", "order": "created_at.asc",
+                                            "limit": str(batch)})
 
     def delete_documents(self, ids: list[str]) -> None:
-        if ids:
-            self.sb.delete("documents", {"id": f"in.({','.join(ids)})"})
+        for i in range(0, len(ids), 100):
+            self.sb.delete("documents", {"id": _ids(ids[i:i + 100])})
 
     def owner_documents(self, owner: str) -> list[dict]:
         return self.sb.select("documents", {"select": "id,chemin", "user_id": f"eq.{owner}"})
@@ -161,10 +202,12 @@ class Database:
         return {"jour": str(row["jour"]), "heure": row["heure"]} if row else None
 
     def bookings_for(self, job_ids: list[str]) -> dict[str, dict]:
-        if not job_ids:
-            return {}
-        rows = self.sb.select("entretiens", {"select": "rapport_id,jour,heure", "rapport_id": f"in.({','.join(job_ids)})"})
-        return {r["rapport_id"]: {"jour": str(r["jour"]), "heure": r["heure"]} for r in rows}
+        """Par lots de 100 identifiants : l'URL reste courte (≈ 4 Ko) quel que soit le nombre de dossiers."""
+        out: dict[str, dict] = {}
+        for i in range(0, len(job_ids), 100):
+            rows = self.sb.select("entretiens", {"select": "rapport_id,jour,heure", "rapport_id": _ids(job_ids[i:i + 100])})
+            out |= {r["rapport_id"]: {"jour": str(r["jour"]), "heure": r["heure"]} for r in rows}
+        return out
 
     def latest_booking(self, owner: str) -> dict | None:
         row = self.sb.select_one("entretiens", {"select": "jour,heure", "user_id": f"eq.{owner}", "order": "created_at.desc"})
@@ -178,6 +221,18 @@ class Database:
     # ------------------------------------------------------------------ audit
     def audit(self, job_id: str | None, acteur: str, action: str, ip: str | None = None) -> None:
         self.sb.insert("audit_logs", {"rapport_id": job_id, "acteur": acteur[:120], "action": action[:120], "ip": ip})
+
+    def purge_audit(self, days: int) -> None:
+        limite = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+        self.sb.delete("audit_logs", {"horodatage": f"lt.{limite}"})
+
+    # ------------------------------------------------------------------ quotas partagés entre instances (fonction SQL)
+    def consume(self, key: str, weight: int, maximum: int, window_s: int) -> bool:
+        """Consomme `weight` sur le quota `key` (fenêtre glissante) ; False si le maximum serait dépassé. Atomique en base."""
+        return bool(self.sb.rpc("consommer_quota", {"p_cle": key[:200], "p_poids": weight, "p_max": maximum, "p_fenetre_s": window_s}))
+
+    def purge_quotas(self) -> None:
+        self.sb.rpc("purger_quotas", {})
 
     def audit_for(self, job_id: str) -> list[dict]:
         return self.sb.select("audit_logs", {"select": "acteur,action,horodatage,ip", "rapport_id": f"eq.{job_id}", "order": "id.asc"})

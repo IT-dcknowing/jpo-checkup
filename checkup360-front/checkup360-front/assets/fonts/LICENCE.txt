@@ -1,0 +1,3 @@
+Polices Caveat, JetBrains Mono, Plus Jakarta Sans, Sora, Poppins et Mrs Saint Delafield (sous-ensembles latin et latin-ext,
+format woff2, issus de Google Fonts) : SIL Open Font License 1.1 — https://openfontlicense.org
+Hébergées sur le site pour ne plus appeler fonts.googleapis.com / fonts.gstatic.com (confidentialité des visiteurs, CSP stricte).

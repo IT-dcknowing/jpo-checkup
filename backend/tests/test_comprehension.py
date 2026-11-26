@@ -2,13 +2,12 @@
 import copy
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from app.comprehension import _num, comprendre
 from app.llm import LLMError
 from app.main import create_app
 from conftest import FakeLLM
 from fake_supabase import FakeSupabase
+from fastapi.testclient import TestClient
 from test_api import auth, client, deposer_fichier, depot, tok, traiter  # noqa: F401 (fixtures)
 
 F = Path(__file__).parent / "fichiers"
@@ -92,6 +91,7 @@ def test_prompt_ia_recoit_la_synthese_anonymisee(settings):
 
 def _journal_ventes(chemin, debut, mois):
     import datetime as dt
+
     from openpyxl import Workbook
     w = Workbook(); ws = w.active; ws.append(["Date", "Facture", "Client", "Montant HT"])
     for m in range(mois):

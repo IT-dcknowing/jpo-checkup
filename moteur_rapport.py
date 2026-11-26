@@ -310,7 +310,6 @@ def plan_action(k, conf, d):
 
 
 def orientation(k, plan):
-    faits = {x["action"].split(" ")[0] + x["action"].split(" ")[1] for x in plan}
     has = lambda mot: any(mot in x["action"] for x in plan)
     a1 = []
     a1.append("FNE active et opérationnelle" if has("FNE") else "Conformité fiscale maintenue")
@@ -492,7 +491,7 @@ def svg_cent(k, w=700, h=62):
         x += ww
     # légende des petits postes
     lx = 0
-    for lab, val, fill, txt in seg:
+    for lab, val, fill, _txt in seg:
         part = val / ca * 100
         if w * part / 100 > len(f"{lab} {fr_num(part, 1)}") * 5 + 12:
             continue
@@ -583,7 +582,7 @@ def main(src, dst):
     base = Path(__file__).parent
     d = json.loads(Path(src).read_text(encoding="utf-8"))
     ctx = construire_contexte(d)
-    env = Environment(loader=FileSystemLoader(base / "templates"), autoescape=False)
+    env = Environment(loader=FileSystemLoader(base / "templates"), autoescape=False)  # noqa: S701 — aperçu local du gabarit, données de démonstration
     html = env.get_template("rapport.html.j2").render(**ctx)
     (base / "out" / "rapport_exemple.html").write_text(html, encoding="utf-8")
     doc = HTML(string=html, base_url=str(base / "templates")).render()

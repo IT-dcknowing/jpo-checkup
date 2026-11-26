@@ -6,9 +6,12 @@
 //   { "type": "invitation", "nom", "jour_long", "horaire", "entretien", "ics_base64" } → invitation (à l'adresse de la session)
 //
 // Authentification (faite ici, verify_jwt désactivé) :
-//   - jeton de session du visiteur : le rapport doit lui appartenir ;
-//   - clé service_role (serveur, renvoi par un conseiller) : accès à tous les rapports.
-// Secrets (Supabase > Edge Functions > Secrets) : RESEND_API_KEY (obligatoire), MAIL_FROM, MAIL_COPY_TO, PUBLIC_SITE_URL.
+//   - jeton de session du visiteur : le rapport doit lui appartenir ; 10 envois par heure au plus ;
+//   - serveur (API Vercel) : clé service_role identique à celle de la fonction, ou en-tête x-cle-interne égal au
+//     secret EDGE_INTERNAL_SECRET (partagé avec Vercel). Accès à tous les rapports.
+// Destinataire : toujours l'adresse ACTUELLE du compte (Supabase Auth), jamais une adresse figée au dépôt.
+// Secrets (Supabase > Edge Functions > Secrets) : RESEND_API_KEY (obligatoire), MAIL_FROM, MAIL_COPY_TO, PUBLIC_SITE_URL,
+// EDGE_INTERNAL_SECRET (recommandé), EMAILS_PAR_HEURE (défaut 10).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.119.0";
 
@@ -18,6 +21,8 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const MAIL_FROM = Deno.env.get("MAIL_FROM") ?? "DC-KNOWING · Diagnostic JPO <diagnostic@dc-knowing.com>";
 const MAIL_COPY_TO = (Deno.env.get("MAIL_COPY_TO") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 const SITE = Deno.env.get("PUBLIC_SITE_URL") ?? "";
+const INTERNE = Deno.env.get("EDGE_INTERNAL_SECRET") ?? "";
+const EMAILS_PAR_HEURE = Number(Deno.env.get("EMAILS_PAR_HEURE") ?? "10") || 10;
 
 const LIEN_VALIDITE_S = 7 * 24 * 3600;      // 7 jours
 const PIECE_JOINTE_MAX = 5 * 1024 * 1024;   // 5 Mo
@@ -27,8 +32,10 @@ const ADRESSE = "Cocody Riviera 2, Abidjan";
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
+// La fonction n'est appelée que par l'API (serveur à serveur) : CORS limité au site, jamais « * ».
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": SITE ? new URL(SITE).origin : "null",
+  "Vary": "Origin",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
@@ -59,22 +66,14 @@ ${p}${b}
 </div></body></html>`;
 }
 
-// Clé serveur au nouveau format (sb_secret_...) ou ancienne clé service_role : on vérifie auprès de Supabase
-// qu'elle ouvre la table audit_logs, réservée au rôle service_role (aucune policy pour les visiteurs).
-const clesServeur = new Set<string>();
-async function estCleServeur(jeton: string): Promise<boolean> {
-  if (clesServeur.has(jeton)) return true;
-  if (!jeton.startsWith("sb_secret_") && !jeton.startsWith("eyJ")) return false;
+// Adresse actuelle du compte : suit un changement d'adresse fait après le dépôt.
+async function adresseActuelle(userId: string, repli: string): Promise<string> {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/audit_logs?select=id&limit=1`, {
-      headers: { apikey: jeton, Authorization: `Bearer ${jeton}` },
-    });
-    if (r.ok) {
-      clesServeur.add(jeton);
-      return true;
-    }
-  } catch (_) { /* clé refusée */ }
-  return false;
+    const { data } = await admin.auth.admin.getUserById(userId);
+    return data?.user?.email || repli;
+  } catch (_) {
+    return repli;
+  }
 }
 
 type PieceJointe = { filename: string; content: string; content_type?: string };
@@ -107,12 +106,17 @@ Deno.serve(async (req) => {
   // ---------------------------------------------------------------- qui appelle ?
   const jeton = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!jeton) return json(401, { error: "Authentification requise" });
-  const serveur = egal(jeton, SERVICE_KEY) || await estCleServeur(jeton);
+  const serveur = egal(jeton, SERVICE_KEY) || (INTERNE !== "" && egal(req.headers.get("x-cle-interne") ?? "", INTERNE));
   let user: { id: string; email?: string } | null = null;
   if (!serveur) {
     const { data, error } = await admin.auth.getUser(jeton);
     if (error || !data.user) return json(401, { error: "Session expirée" });
     user = data.user;
+    // limite d'envois par visiteur (partagée en base avec l'API : fonction consommer_quota)
+    const { data: permis, error: errQ } = await admin.rpc("consommer_quota",
+      { p_cle: `email:${user.id}`, p_poids: 1, p_max: EMAILS_PAR_HEURE, p_fenetre_s: 3600 });
+    if (errQ) console.error("quota e-mail", errQ);
+    else if (!permis) return json(429, { error: "Trop d'envois : réessayez plus tard" });
   }
 
   let body: Record<string, unknown>;
@@ -156,6 +160,7 @@ Deno.serve(async (req) => {
   if (!rapport || (!serveur && rapport.user_id !== user!.id)) return json(404, { error: "Rapport introuvable" });
 
   const nom = String((rapport.formulaire as Record<string, unknown>)?.contact_nom ?? "");
+  const destinataire = user?.email || await adresseActuelle(rapport.user_id, rapport.email);
 
   if (type === "excuse") {
     const nonReconnu = body.motif === "non_reconnu";
@@ -165,7 +170,7 @@ Deno.serve(async (req) => {
         ? "Votre diagnostic n'a pas pu être produit automatiquement à la suite d'un incident technique."
         : "Nous vous prions de nous excuser : les documents déposés n'ont pas pu être lus de façon assez fiable pour produire un rapport automatique.";
     try {
-      await envoyer(rapport.email, "Votre diagnostic — un conseiller vous rappelle",
+      await envoyer(destinataire, "Votre diagnostic — un conseiller vous rappelle",
         page(["Bonjour,", esc(raison),
           "Plutôt que de vous envoyer des chiffres incertains, un conseiller vous rappelle dans la journée pour reprendre votre diagnostic avec vous.",
           `Si vous êtes encore au salon, passez au stand Check-up 360 (siège DC-KNOWING, ${esc(ADRESSE)}) avec une version numérique de votre balance générale.`,
@@ -199,7 +204,7 @@ Deno.serve(async (req) => {
     const p = `${rapport.score_performance}/100 (${rapport.grade_performance})`;
     const c = `${rapport.score_conformite}/100 (${rapport.grade_conformite})`;
     const espace = SITE ? `<a href="${esc(SITE)}" style="color:#000">« Mes diagnostics »</a>` : "« Mes diagnostics »";
-    await envoyer(rapport.email, "Votre diagnostic financier — Journées Portes Ouvertes DC-KNOWING",
+    await envoyer(destinataire, "Votre diagnostic financier — Journées Portes Ouvertes DC-KNOWING",
       page([`Bonjour ${esc(nom)},`, `Votre diagnostic est prêt : <b>performance ${esc(p)}</b> et <b>conformité ${esc(c)}</b>.`,
         `En bref : ${esc(verdict)}`,
         `Il est aussi rangé dans ${espace}, avec votre invitation et le programme. Votre conseiller vous attend pour un entretien individuel.`,

@@ -125,7 +125,9 @@
      F. Rédaction     generer_rapport.py → rapport.md (section 11)
      F'. Appel IA n°2 reformulation facultative du .md (section 10)
      G. Rendu Word    md_vers_word.js → .docx, 4 pages exactement ; PDF de
-                      contrôle via LibreOffice (section 11)
+                      contrôle via LibreOffice (section 11). En production (Vercel),
+                      LibreOffice est absent : les pages ne sont pas comptées ; le
+                      gabarit tient en 4 pages sur les cas types (écart assumé).
      H. Envoi         SendGrid (ou Mailgun) + stockage chiffré + statut
 
  3.2 Conteneurs (Docker Compose)

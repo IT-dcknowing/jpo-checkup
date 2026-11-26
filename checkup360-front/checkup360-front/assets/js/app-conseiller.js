@@ -11,7 +11,7 @@ class Component extends DCLogic {
     this.timers = [];
     this.FLOW = ['EN_ATTENTE', 'LECTURE', 'MAPPING_IA', 'CALCUL', 'INTERPRETATION', 'PDF', 'ENVOYE'];
     this.STL = { EN_ATTENTE: 'En attente', LECTURE: 'Lecture', MAPPING_IA: 'Analyse IA', CALCUL: 'Calcul', INTERPRETATION: 'Interprétation', PDF: 'PDF', ENVOYE: 'Envoyé', ERREUR: 'Erreur' };
-    this.state = { logged: API.admin.isLogged(), lf: { mail: '', pw: '' }, pwShow: false, loginErr: null, loginBusy: false, day: '16', filter: 'all', q: '', typeF: '', selId: null, jobs: MOCK ? this.seed() : [], loading: false, toasts: [], logoutModal: false, busy: null, newId: null };
+    this.state = { logged: API.admin.isLogged(), lf: { mail: '', pw: '', code: '' }, pwShow: false, loginErr: null, loginBusy: false, day: '16', filter: 'all', q: '', typeF: '', selId: null, jobs: MOCK ? this.seed() : [], loading: false, toasts: [], logoutModal: false, busy: null, newId: null };
   }
   golden() {
     return {
@@ -136,7 +136,7 @@ class Component extends DCLogic {
       plan: (j.plan || []).map(([prio, a, m]) => ({ prio, a, cls: prioCls[prio], mod: 'p-' + m, modL: modL[m] })),
       hasAlerts: (j.alertes || []).length > 0, hasPlan: (j.plan || []).length > 0,
       hist,
-      audit: real ? (j.auditApi || []).map((a) => hm(a.horodatage) + ' · ' + a.acteur + ' · ' + a.action) : [tAt(0) + ' · système · dépôt reçu (empreinte SHA-256)', tAt(1) + ' · worker · fichiers lus en conteneur isolé'].concat(j.statut === 'ENVOYE' ? [tAt(6) + ' · système · PDF stocké chiffré, e-mail envoyé'] : []),
+      audit: real ? (j.auditApi || []).map((a) => hm(a.horodatage) + ' · ' + a.acteur + ' · ' + a.action) : [tAt(0) + ' · système · dépôt reçu', tAt(1) + ' · système · fichiers lus puis supprimés'].concat(j.statut === 'ENVOYE' ? [tAt(6) + ' · système · rapport Word stocké, e-mail envoyé'] : []),
       openL: 'Voir le détail de ' + j.nom
     };
   }
@@ -173,13 +173,14 @@ class Component extends DCLogic {
       loginErr: s.loginErr, loginCls: s.loginBusy ? 'loading' : '',
       onMail: (e) => { const v = e.target.value; this.setState((st) => ({ lf: { ...st.lf, mail: v }, loginErr: null })); },
       onPw: (e) => { const v = e.target.value; this.setState((st) => ({ lf: { ...st.lf, pw: v }, loginErr: null })); },
+      onCode: (e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 6); this.setState((st) => ({ lf: { ...st.lf, code: v }, loginErr: null })); },
       togglePw: () => this.setState({ pwShow: !s.pwShow }),
       login: (e) => {
         e.preventDefault();
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s.lf.mail) || !s.lf.pw) { this.setState({ loginErr: 'Saisissez votre e-mail professionnel et votre mot de passe.' }); return; }
         this.setState({ loginBusy: true });
-        API.admin.login(s.lf.mail.trim(), s.lf.pw).then(() => { this.setState({ loginBusy: false, logged: true, lf: { ...s.lf, pw: '' } }); this.startLive(); this.toast('ok', 'Connecté', 'Bonne journée de salon !'); })
-          .catch((err) => this.setState({ loginBusy: false, loginErr: err.status === 401 ? 'E-mail ou mot de passe incorrect.' : err.message }));
+        API.admin.login(s.lf.mail.trim(), s.lf.pw, s.lf.code).then(() => { this.setState({ loginBusy: false, logged: true, lf: { ...s.lf, pw: '', code: '' } }); this.startLive(); this.toast('ok', 'Connecté', API.admin.role() === 'lecture' ? 'Compte en lecture seule.' : 'Bonne journée de salon !'); })
+          .catch((err) => this.setState({ loginBusy: false, loginErr: err.status === 401 && /code/i.test(err.message) ? 'Saisissez le code à 6 chiffres de votre application d’authentification.' : err.status === 401 ? 'E-mail, mot de passe ou code incorrect.' : err.message }));
       },
       days: [['16', 'Mer. 16'], ['17', 'Jeu. 17'], ['18', 'Ven. 18']].map(([v, l]) => ({ l, cls: s.day === v ? 'tab on' : 'tab', pressed: s.day === v ? 'true' : 'false', pick: () => this.setState({ day: v, selId: null }) })),
       dayLong: dayL[s.day], userName: name, initials,
@@ -208,7 +209,7 @@ class Component extends DCLogic {
       askLogout: () => this.setState({ logoutModal: true }),
       cancelLogout: () => this.setState({ logoutModal: false }),
       ovcClick: (e) => { if (e.target === e.currentTarget) this.setState({ logoutModal: false }); },
-      logout: () => { API.admin.logout(); this.clearT(); this.setState({ logged: false, logoutModal: false, selId: null, lf: { mail: '', pw: '' }, toasts: [] }); },
+      logout: () => { API.admin.logout(); this.clearT(); this.setState({ logged: false, logoutModal: false, selId: null, lf: { mail: '', pw: '', code: '' }, toasts: [] }); },
       toasts
     };
   }

@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from .llm import LLMError, LLMClient
+from .llm import LLMClient, LLMError
 from .readers import fit_budget
 from .schemas import ACTIF_FIELDS, CR_FIELDS, ND, PASSIF_FIELDS, DepotForm, IAOutput
 
@@ -130,17 +130,36 @@ def finalize(out: IAOutput, form: DepotForm, modele: str, extra_warnings: list[s
                       warnings=warnings, modele=modele)
 
 
+ECART_MAX = 0.05  # 5 % d'écart toléré entre la valeur lue par l'IA et le total calculé par le serveur
+
+
+def _ecart(ia_valeur, calcul: float) -> float:
+    try:
+        v = float(ia_valeur)
+    except (TypeError, ValueError):
+        return 1.0
+    base = max(abs(calcul), 1.0)
+    return abs(v - calcul) / base
+
+
 def completer(ia: dict, comp) -> list[str]:
     """Complète la sortie de l'IA avec les totaux calculés par le serveur (comprehension.py) là où elle n'a rien trouvé
     de fiable. Retourne la liste des postes complétés."""
-    faits = []
+    faits, ecarts = [], []
     for (zone, champ), f in comp.faits.items():
         bloc = ia["compte_resultat"] if zone == "compte_resultat" else ia["bilan"][zone]
         node = bloc.get(champ)
         if node is None:
             continue
+        calcul = {"valeur": float(round(f.valeur)), "confiance": f.confiance, "sources": f.source[:300]}
         if node["valeur"] == ND or node["confiance"] < CONF_MIN:
-            bloc[champ] = {"valeur": float(round(f.valeur)), "confiance": f.confiance, "sources": f.source[:300]}
+            bloc[champ] = calcul
+            faits.append(champ)
+        elif _ecart(node["valeur"], f.valeur) > ECART_MAX:
+            # l'IA contredit un total calculé exactement sur les fichiers (erreur, ou consigne glissée dans un document) :
+            # le total du serveur l'emporte et l'écart est signalé au conseiller
+            ecarts.append(f"{champ} : IA {round(float(node['valeur']))} ≠ calcul {round(f.valeur)} FCFA, valeur calculée retenue")
+            bloc[champ] = calcul
             faits.append(champ)
     meta = ia["meta"]
     if comp.debut and comp.fin and not (_is_date(meta["period_start"]) and _is_date(meta["period_end"])):
@@ -148,7 +167,7 @@ def completer(ia: dict, comp) -> list[str]:
     if faits:
         meta["confidence_global"] = None  # recalculée sur les postes réellement lus
         meta["warnings"] = list(meta.get("warnings") or []) + [f"calculé par le serveur à partir des fichiers : {', '.join(faits)}"] \
-            + list(comp.avertissements)
+            + ecarts + list(comp.avertissements)
     return faits
 
 

@@ -1,0 +1,63 @@
+# Intégration continue : chaque push et chaque pull request.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: API Python (lint, tests, couverture, CVE)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Dépendances
+        run: |
+          pip install -r backend/requirements.txt
+          npm ci --omit=dev
+      - name: Lint (ruff)
+        run: ruff check backend api moteur_rapport.py word/generer_rapport.py
+      - name: Tests + couverture (80 % minimum)
+        run: python -m pytest -q --cov --cov-report=term
+      - name: Vulnérabilités connues (pip-audit)
+        run: pip-audit -r requirements.txt
+
+  sql:
+    name: Migrations et isolation des données (Postgres)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Migrations + tests RLS sur une base jetable
+        run: PG_BIN=/usr/lib/postgresql/16/bin supabase/tests/run.sh
+
+  front:
+    name: Front, rendu Word et Edge Function
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntaxe JavaScript
+        run: |
+          for f in checkup360-front/checkup360-front/config.js checkup360-front/checkup360-front/assets/js/*.js api/docx.js word/md_vers_word.js; do
+            node --check "$f"
+          done
+      - name: Vulnérabilités connues (npm audit)
+        run: npm audit --omit=dev --audit-level=high
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Typage de l'Edge Function
+        run: deno check --node-modules-dir=none supabase/functions/envoyer-rapport/index.ts

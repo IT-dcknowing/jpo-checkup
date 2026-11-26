@@ -37,7 +37,8 @@ def _load_engine(settings: Settings):
         if p not in sys.path:
             sys.path.insert(0, p)
     import generer_rapport  # noqa: WPS433  (rédaction du Markdown, dossier word/)
-    import moteur_rapport   # noqa: WPS433  (calculs et barèmes)
+
+    import moteur_rapport  # noqa: WPS433  (calculs et barèmes)
     return generer_rapport, moteur_rapport
 
 
@@ -205,7 +206,12 @@ def build_report(settings: Settings, data: dict, out_dir: Path, base_name: str) 
         _render_docx(settings, md_path, docx_path)
         pdf = _to_pdf(settings, docx_path, out_dir)
         pages = _count_pages(pdf) if pdf else None
-        if pages is None or pages <= 4:
+        if pages is None:
+            # Sans LibreOffice (cas de Vercel), les pages ne sont pas comptées : le contrôle « 4 pages » ne s'applique pas.
+            # Le gabarit normal tient en 4 pages sur les cas types (exemples/) ; écart assumé et documenté (SPEC §8).
+            log.info("contrôle 4 pages non effectué (LibreOffice absent)")
+            break
+        if pages <= 4:
             break
     resume["pages"] = pages
     return ReportResult(docx=docx_path, md=md_path, pdf=pdf, pages=pages, mode_compact=compact, resume=resume)

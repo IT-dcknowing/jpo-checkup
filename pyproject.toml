@@ -1,0 +1,34 @@
+# Outillage qualité (pas un paquet installable) : ruff (lint), pytest et couverture. Utilisé en CI (.github/workflows/ci.yml).
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+extend-exclude = ["node_modules", "public"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "S", "UP", "I"]
+ignore = [
+  "E501",   # lignes longues : style du projet
+  "E731",   # lambdas nommées (petites fonctions locales)
+  "S101",   # assert (tests)
+  "S603", "S607",  # subprocess avec liste d'arguments (rendu Word / LibreOffice local)
+  "B008",   # Depends(...) dans les signatures FastAPI
+  "UP007", "UP045",
+  "E702", "E741",  # style compact du moteur de calcul (moteur_rapport.py, generer_rapport.py)
+  "B905",   # zip() sans strict : utilisé volontairement pour tronquer (lecture plafonnée)
+  "S108",   # /tmp : seul dossier inscriptible sur Vercel
+]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/tests/*" = ["S105", "S106", "S108", "S311", "B017", "F811", "F401"]
+"api/index.py" = ["E402", "I001"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["backend", "backend/tests"]
+
+[tool.coverage.run]
+source = ["backend/app"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = false

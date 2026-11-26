@@ -1,9 +1,32 @@
-# Dépendances de l'API Python déployée sur Vercel (api/index.py). Tests : backend/requirements.txt
-fastapi>=0.115
-pydantic>=2.7
-python-dotenv>=1.0
-httpx>=0.27
-pandas>=2.2
-openpyxl>=3.1
-chardet>=5.2
-pdfplumber>=0.11
+# Dépendances de l'API Python déployée sur Vercel (api/index.py) — versions figées (build reproductible).
+# Directes : fastapi, pydantic, python-dotenv, httpx, openpyxl, chardet, pdfplumber, sentry-sdk ; le reste est transitif.
+# Mise à jour : Dependabot (.github/dependabot.yml) ; contrôle CVE : pip-audit en CI. pandas retiré (jamais importé).
+annotated-doc==0.0.7
+annotated-types==0.8.0
+anyio==4.16.0
+certifi==2026.11.20
+cffi==2.1.1
+chardet==7.7.0
+charset-normalizer==3.5.3
+cryptography==50.0.2
+et_xmlfile==2.0.0
+fastapi==0.165.0
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.20
+openpyxl==3.1.5
+opentelemetry-api==1.45.2
+pdfminer.six==20260107
+pdfplumber==0.11.11
+pillow==13.0.0
+pycparser==3.12
+pydantic==2.14.4
+pydantic_core==2.50.5
+pypdfium2==5.15.2
+python-dotenv==1.2.4
+sentry-sdk==3.0.1
+starlette==1.10.0
+typing-inspection==0.4.5
+typing_extensions==4.16.0
+urllib3==2.8.0

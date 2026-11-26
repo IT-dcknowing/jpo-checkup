@@ -2,7 +2,6 @@ import json
 
 import httpx
 import pytest
-
 from app import report
 from app.anonymize import anonymize
 from app.extraction import LectureImpossible, finalize

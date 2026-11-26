@@ -5,7 +5,8 @@ import json
 import logging
 import re
 import time
-from typing import Any, Callable, Protocol, TypeVar
+from collections.abc import Callable
+from typing import Any, Protocol, TypeVar
 
 import httpx
 from pydantic import ValidationError
@@ -40,7 +41,7 @@ def parse_json_text(text: str) -> dict:
     except json.JSONDecodeError:
         i, j = t.find("{"), t.rfind("}")
         if i < 0 or j <= i:
-            raise ValueError("aucun objet JSON dans la réponse")
+            raise ValueError("aucun objet JSON dans la réponse") from None
         out = json.loads(t[i : j + 1])
     if not isinstance(out, dict):
         raise ValueError("la réponse n'est pas un objet JSON")
@@ -129,6 +130,9 @@ class OpenRouterClient:
     def complete_validated(self, system: str, user: str, validate: Callable[[dict], T]) -> tuple[T, str]:
         if not self.s.openrouter_api_key:
             raise LLMAuthError("OPENROUTER_API_KEY n'est pas renseignée (fichier backend/.env)")
+        if self.s.production and (pb := self.s.problemes_ia()):
+            # notice ARTCI : « prestataire IA configuré sans collecte » ; aucun envoi tant que ce n'est pas vrai
+            raise LLMAuthError("configuration IA refusée en production : " + " ; ".join(pb))
         errors: list[str] = []
         debut = time.monotonic()
         for model in self.s.llm_models:
@@ -142,7 +146,7 @@ class OpenRouterClient:
             else:
                 self._deadline = None
             messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-            for essai in range(2):  # essai initial + une relance avec le message d'erreur (spec §4.3)
+            for _essai in range(2):  # essai initial + une relance avec le message d'erreur (spec §4.3)
                 try:
                     text = self._call(model, messages)
                 except _Transient as e:

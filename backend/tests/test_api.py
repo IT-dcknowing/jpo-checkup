@@ -1,18 +1,17 @@
 """Parcours complets de l'API avec un Supabase simulé (fake_supabase) : dépôt, traitement, isolation, entretiens, conseillers."""
 import io
 import zipfile
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app.llm import LLMError
 from app.main import create_app, purge
 from conftest import FORM, FakeLLM
 from fake_supabase import FakeSupabase
+from fastapi.testclient import TestClient
 
-CSV = "compte;libelle;solde\n701;Ventes;125000000\n601;Achats;82000000\n".encode("utf-8")
-SANS_CHIFFRES = "nom;ville;observations\nDupont;Abidjan;rien\nKone;Bouake;neant\n".encode("utf-8")  # aucune donnée comptable
+CSV = b"compte;libelle;solde\n701;Ventes;125000000\n601;Achats;82000000\n"
+SANS_CHIFFRES = b"nom;ville;observations\nDupont;Abidjan;rien\nKone;Bouake;neant\n"  # aucune donnée comptable
 ADMIN = {"email": "conseiller@dc-knowing.ci", "password": "mot-de-passe-test"}
 
 
@@ -21,9 +20,9 @@ def auth(token):
 
 
 def deposer_fichier(sb: FakeSupabase, token: str, nom="balance.csv", data=CSV, categorie="balance") -> str:
-    """Ce que fait le navigateur : fichier dans Storage + ligne public.documents (RLS)."""
+    """Ce que fait le serveur (POST /api/fichiers : ligne documents) puis le navigateur (envoi par jeton signé)."""
     uid = sb.user_id(token)
-    chemin = f"{uid}/{len(sb.storage['documents'])}-{nom}"
+    chemin = f"{uid}/{len(sb.tables['documents'])}-{nom}"
     sb.upload("documents", chemin, data, "text/csv")
     return sb.insert("documents", {"user_id": uid, "nom_fichier": nom, "chemin": chemin, "taille": len(data), "type": "text/csv",
                                    "categorie": categorie})[0]["id"]
@@ -76,7 +75,7 @@ def test_full_flow(client, tok):
     assert row["chemin_fichier"] == f"{client.sb.user_id(tok)}/{job_id}.docx"
     docx = client.sb.storage["rapports"][row["chemin_fichier"]]
     with zipfile.ZipFile(io.BytesIO(docx)) as z:
-        assert "Kouassi".encode() in z.read("word/document.xml")
+        assert b"Kouassi" in z.read("word/document.xml")
     # l'Edge Function est appelée avec le jeton du visiteur (contrôle de propriété côté fonction)
     assert ("envoyer-rapport", {"rapport_id": job_id}, tok) in client.sb.invocations
     # l'IA ne reçoit pas les identifiants du visiteur
@@ -156,18 +155,41 @@ def test_ia_failure_gives_error_and_apology(settings):
 
 
 def test_purge(client, tok):
-    job_id = depot(client, tok).json()["job_id"]
-    vieux = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat()
-    client.sb.tables["documents"][0]["created_at"] = vieux
-    row = client.sb.tables["rapports"][0]
-    row["created_at"] = vieux
+    """Rétention : fichiers bruts ET lignes documents après 24 h ; dossier entier (ligne, rapport Word, entretien) après 30 jours."""
+    vieux_id = depot(client, tok).json()["job_id"]
+    recent_id = depot(client, tok).json()["job_id"]
+    vieux = (datetime.now(UTC) - timedelta(days=40)).isoformat()
+    il_y_a_20_min = (datetime.now(UTC) - timedelta(minutes=20)).isoformat()
+    for d in client.sb.tables["documents"]:
+        d["created_at"] = vieux
+    for r in client.sb.tables["rapports"]:
+        r["created_at"] = vieux if r["id"] == vieux_id else il_y_a_20_min
+    row = next(r for r in client.sb.tables["rapports"] if r["id"] == vieux_id)
     row["chemin_fichier"] = "x/y.docx"
     client.sb.storage["rapports"]["x/y.docx"] = b"PK"
+    client.sb.tables["audit_logs"].append({"rapport_id": None, "acteur": "x", "action": "ancien", "ip": "1.2.3.4",
+                                           "horodatage": (datetime.now(UTC) - timedelta(days=400)).isoformat()})
     assert client.get("/api/cron/purge").status_code == 401
     out = client.get("/api/cron/purge", headers=auth("secret-cron-test")).json()
-    assert out["fichiers_bruts"] == 1 and out["rapports"] == 1 and out["traitements_interrompus"] == 1
+    assert out == {"fichiers_bruts": 2, "rapports": 1, "traitements_interrompus": 1}
     assert client.sb.storage["documents"] == {} and client.sb.storage["rapports"] == {}
-    assert client.get(f"/api/diagnostics/{job_id}", headers=auth(tok)).json()["statut"] == "ERREUR"
+    assert client.sb.tables["documents"] == []                                    # plus de lignes orphelines
+    assert [r["id"] for r in client.sb.tables["rapports"]] == [recent_id]         # dossier de 40 jours supprimé
+    assert not any(a["action"] == "ancien" for a in client.sb.tables["audit_logs"])
+    assert client.get(f"/api/diagnostics/{vieux_id}", headers=auth(tok)).status_code == 404
+    assert client.get(f"/api/diagnostics/{recent_id}", headers=auth(tok)).json()["statut"] == "ERREUR"
+
+
+def test_purge_au_dela_de_la_limite_postgrest(client, tok):
+    """Plus de lignes que max_rows : la purge travaille par lots et n'en oublie aucune."""
+    uid = client.sb.user_id(tok)
+    vieux = (datetime.now(UTC) - timedelta(days=2)).isoformat()
+    for i in range(1203):
+        client.sb.storage["documents"][f"{uid}/{i}.csv"] = b"x"
+        client.sb.tables["documents"].append({"id": f"d{i}", "user_id": uid, "rapport_id": None, "chemin": f"{uid}/{i}.csv",
+                                              "nom_fichier": "a.csv", "created_at": vieux})
+    out = purge(client.app.state.db, client.sb, client.settings)
+    assert out["fichiers_bruts"] == 1203 and client.sb.storage["documents"] == {} and client.sb.tables["documents"] == []
 
 
 def test_interview_booking(client, tok):

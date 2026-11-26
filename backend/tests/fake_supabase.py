@@ -2,14 +2,15 @@
 from __future__ import annotations
 
 import copy
+import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 from app.supa import SupabaseError
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _match(row: dict, key: str, cond: str) -> bool:
@@ -35,7 +36,8 @@ class FakeSupabase:
     RESERVED = {"select", "order", "limit"}
 
     def __init__(self) -> None:
-        self.tables: dict[str, list[dict]] = {k: [] for k in ("profiles", "rapports", "documents", "entretiens", "audit_logs", "compteurs")}
+        self.tables: dict[str, list[dict]] = {k: [] for k in ("profiles", "rapports", "documents", "entretiens", "audit_logs", "compteurs",
+                                                              "quotas")}
         self.storage: dict[str, dict[str, bytes]] = {"documents": {}, "rapports": {}}
         self.users: dict[str, dict] = {}       # jeton -> utilisateur
         self.invocations: list[tuple[str, dict, str | None]] = []
@@ -83,7 +85,9 @@ class FakeSupabase:
             if table == "documents":
                 r.setdefault("rapport_id", None)
                 r.setdefault("categorie", "autre")
-            if table != "audit_logs":
+            if table == "audit_logs":
+                r.setdefault("horodatage", _now())
+            else:
                 r.setdefault("id", str(uuid.uuid4()))
             r.setdefault("created_at", _now())
             self.tables[table].append(r)
@@ -106,6 +110,36 @@ class FakeSupabase:
         return copy.deepcopy(rows)
 
     def rpc(self, fn, args):
+        if fn == "creer_rapport":
+            uid = args["p_user"]
+            depuis = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+            if sum(1 for r in self.tables["rapports"] if r["user_id"] == uid and r["created_at"] >= depuis) >= args["p_limite_heure"]:
+                raise SupabaseError(400, "QUOTA_DEPOTS")
+            libres = [d for d in self.tables["documents"] if d["id"] in args["p_documents"] and d["user_id"] == uid and not d["rapport_id"]]
+            if len(libres) != len(args["p_documents"]):
+                raise SupabaseError(400, "DOCUMENTS_INDISPONIBLES")
+            ref = self.rpc("prochaine_reference", {"p_annee": str(args["p_jour"])[:4]})
+            row = self.insert("rapports", {"user_id": uid, "email": args["p_email"], "reference": ref,
+                                           "titre": f"Diagnostic {ref} — {args['p_titre_entreprise']}"[:200],
+                                           "jour_evenement": args["p_jour"], "secteur": args["p_secteur"], "formulaire": args["p_formulaire"]})[0]
+            for d in libres:
+                d["rapport_id"] = row["id"]
+                d["categorie"] = args["p_categories"].get(d["id"], d["categorie"])
+            return [row]
+        if fn == "fusionner_donnees":
+            r = next(r for r in self.tables["rapports"] if r["id"] == args["p_id"])
+            r["donnees"] = {**r["donnees"], **copy.deepcopy(args["p_patch"])}
+            return None
+        if fn == "consommer_quota":
+            now = time.time()
+            total = sum(q["poids"] for q in self.tables["quotas"] if q["cle"] == args["p_cle"] and q["t"] > now - args["p_fenetre_s"])
+            if total + args["p_poids"] > args["p_max"]:
+                return False
+            self.tables["quotas"].append({"cle": args["p_cle"], "poids": args["p_poids"], "t": now, "created_at": _now()})
+            return True
+        if fn == "purger_quotas":
+            self.tables["quotas"] = [q for q in self.tables["quotas"] if q["t"] > time.time() - 2 * 86400]
+            return None
         if fn == "prochaine_reference":
             c = next((c for c in self.tables["compteurs"] if c["annee"] == args["p_annee"]), None)
             if not c:
@@ -155,10 +189,20 @@ class FakeSupabase:
         for p in paths:
             self.storage[bucket].pop(p, None)
 
+    def signed_upload(self, bucket, path):
+        return f"jeton-envoi:{bucket}/{path}"
+
+    def object_size(self, bucket, path):
+        data = self.storage[bucket].get(path)
+        return None if data is None else len(data)
+
     def signed_url(self, bucket, path, expires_in, download_name=None):
         return f"https://fake.supabase.co/storage/v1/object/sign/{bucket}/{path}?token=signe&expires={expires_in}"
 
     # ------------------------------------------------------------------ auth
+    def forget_user(self, token):
+        return None
+
     def get_user(self, token):
         return copy.deepcopy(self.users.get(token))
 
