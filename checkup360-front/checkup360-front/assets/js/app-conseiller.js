@@ -47,7 +47,7 @@ class Component extends DCLogic {
       type: d.type_client || 'PROSPECT', secteur: d.secteur || '—', eff: d.effectif || '—',
       heure: d.heure || (t ? String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') : '--:--'),
       statut: d.statut || 'EN_ATTENTE', perf: d.score_performance ?? null, conf: d.score_conformite ?? null, couv: d.couverture_pct ?? null,
-      ent: d.entretien_realise ? 'Fait' : d.rappel_effectue ? 'Rappelé' : (d.entretien || null), indicatif: !!d.indicatif,
+      ent: d.entretien_realise ? 'Fait' : d.rappel_effectue ? 'Rappelé' : (d.entretien ? (d.entretien_jour && !(d.jours_visite || []).every((j) => j === d.entretien_jour) ? d.entretien_jour.slice(8) + '/12 ' : '') + d.entretien : null), indicatif: !!d.indicatif,
       alertes: (d.alertes || []).map((a) => Array.isArray(a) ? a : [niv[(a.niveau || '').toLowerCase()] || a.niveau || 'Info', a.texte || a.message || '']),
       plan: (d.plan_action || []).map((p) => Array.isArray(p) ? p : [p.priorite || p.prio, p.action, mod(p.module || p.outil)]),
       errMsg: d.erreur || null, journal: d.journal || null, auditApi: d.audit || null

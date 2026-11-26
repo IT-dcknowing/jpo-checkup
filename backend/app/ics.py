@@ -26,16 +26,18 @@ def _utc(jour: str, hhmm: str) -> str:
     return datetime.fromisoformat(jour).replace(hour=int(h), minute=int(m), tzinfo=UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
-def build_ics(uid_base: str, jour: str, debut: str, fin: str, lieu: str, entretien: str | None = None, minutes: int = 30) -> bytes:
+def build_ics(uid_base: str, journees: list[tuple[str, str, str, str]], lieu: str, entretien: tuple[str, str] | None = None,
+              minutes: int = 45) -> bytes:
+    """Un événement par jour de visite (jour, début, fin, description), plus l'entretien (jour, heure) s'il est réservé."""
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    events = [(f"{uid_base}-jpo", "Journées Portes Ouvertes DC-KNOWING", _utc(jour, debut), _utc(jour, fin),
-               "Journées Portes Ouvertes DC-KNOWING : Check-up 360, entretiens individuels et présentation de La Suite Flow."
-               + (f" Votre entretien individuel est à {entretien}." if entretien else ""))]
+    events = [(f"{uid_base}-jpo-{jour}", "Journées Portes Ouvertes DC-KNOWING", _utc(jour, debut), _utc(jour, fin), description)
+              for jour, debut, fin, description in journees]
     if entretien:
-        h, m = map(int, entretien.split(":"))
+        jour, heure = entretien
+        h, m = map(int, heure.split(":"))
         end = (datetime(2000, 1, 1, h, m) + timedelta(minutes=minutes)).strftime("%H:%M")
-        events.append((f"{uid_base}-entretien", "Entretien individuel Check-up 360 (DC-KNOWING)", _utc(jour, entretien), _utc(jour, end),
-                       "Un expert DC-KNOWING chiffre votre plan d'action avec vous."))
+        events.append((f"{uid_base}-entretien", "Entretien individuel Check-up 360 (DC-KNOWING)", _utc(jour, heure), _utc(jour, end),
+                       "Un expert DC-KNOWING commente vos chiffres avec vous. Arrivez à l'heure : l'accueil est compris dans le créneau."))
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//DC-KNOWING//JPO 2026//FR", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"]
     for uid, titre, start, end, desc in events:
         lines += ["BEGIN:VEVENT", f"UID:{uid}@dc-knowing.com", f"DTSTAMP:{stamp}", f"DTSTART:{start}", f"DTEND:{end}",

@@ -3,6 +3,7 @@
 // Corps JSON :
 //   { "rapport_id": "<uuid>" }                       → e-mail du rapport (lien signé 7 jours, pièce jointe si < 5 Mo)
 //   { "rapport_id": "<uuid>", "type": "excuse" }      → e-mail d'excuse après un échec de lecture
+//   { "rapport_id": "<uuid>", "type": "rappel", "jour_long", "accroche", "programme": [], "entretien" } → veille (serveur)
 //   { "type": "invitation", "nom", "jour_long", "horaire", "entretien", "ics_base64" } → invitation (à l'adresse de la session)
 //
 // Authentification (faite ici, verify_jwt désactivé) :
@@ -154,8 +155,8 @@ Deno.serve(async (req) => {
     const nom = String(body.nom ?? "").slice(0, 120);
     const jour = String(body.jour_long ?? "").slice(0, 80);
     const horaire = String(body.horaire ?? "").slice(0, 80);
-    const entretien = body.entretien ? String(body.entretien).slice(0, 5) : null;
-    const ligne = entretien ? `Votre entretien individuel est réservé à ${entretien}.` : "Vous pouvez réserver votre entretien individuel depuis « Mes diagnostics ».";
+    const entretien = body.entretien ? String(body.entretien).slice(0, 60) : null;
+    const ligne = entretien ? `Votre entretien individuel est réservé : ${entretien}.` : "Vous pouvez réserver votre entretien individuel depuis « Mes diagnostics ».";
     try {
       await envoyer(user.email, "Votre invitation — Journées Portes Ouvertes DC-KNOWING",
         page([`Bonjour ${esc(nom)},`, `Vous êtes invité aux <b>Journées Portes Ouvertes DC-KNOWING</b> : ${esc(jour)}, ${esc(horaire)}.`, esc(ligne),
@@ -180,6 +181,25 @@ Deno.serve(async (req) => {
 
   const nom = String((rapport.formulaire as Record<string, unknown>)?.contact_nom ?? "");
   const destinataire = user?.email || await adresseActuelle(rapport.user_id, rapport.email);
+
+  if (type === "rappel") {
+    if (!serveur) return json(403, { error: "Réservé au serveur" });
+    const jour = String(body.jour_long ?? "").slice(0, 80);
+    const accroche = String(body.accroche ?? "").slice(0, 160);
+    const programme = (Array.isArray(body.programme) ? body.programme : []).slice(0, 12).map((x) => String(x).slice(0, 120));
+    const heure = body.entretien ? String(body.entretien).slice(0, 5) : null;
+    const ligne = heure ? `Votre entretien individuel est demain à ${heure}.` : "";
+    try {
+      await envoyer(destinataire, `Demain, ${jour} — Journées Portes Ouvertes DC-KNOWING`,
+        page([`Bonjour ${esc(nom)},`, `<b>${esc(accroche)}</b>`, ...(ligne ? [esc(ligne)] : []), `Le programme :<br>${programme.map(esc).join("<br>")}`,
+          `Lieu : siège DC-KNOWING, ${esc(ADRESSE)}.`]),
+        `Bonjour ${nom},\n\n${accroche}\n${ligne}\n\n${programme.join("\n")}\n\nLieu : siège DC-KNOWING, ${ADRESSE}.\n\n${PIED}\n`);
+      return json(200, { ok: true });
+    } catch (e) {
+      console.error("rappel", e);
+      return json(502, { error: "Envoi impossible pour le moment" });
+    }
+  }
 
   if (type === "excuse") {
     const nonReconnu = body.motif === "non_reconnu";

@@ -114,4 +114,14 @@ select pg_temp.ok((select email from public.rapports) = 'a.nouveau@exemple.ci', 
 select pg_temp.ok((select allowed_mime_types from storage.buckets where id = 'documents') =
   array['application/pdf', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'], 'types MIME alignés');
 
+-- ---------------------------------------------------------------- plusieurs jours, un entretien par compte
+select pg_temp.ok((select jours_visite = array[jour_evenement] from public.rapports), 'jour unique repris dans jours_visite');
+select pg_temp.ok(public.reserver_entretien((select id from public.rapports), 'aaaaaaaa-0000-0000-0000-000000000001', '2026-12-17', '14:15', 1),
+  'réservation d''un créneau');
+select pg_temp.ok((select '2026-12-17'::date = any(jours_visite) from public.rapports), 'jour réservé ajouté à la visite');
+select pg_temp.ok(public.reserver_entretien((select id from public.rapports), 'aaaaaaaa-0000-0000-0000-000000000001', '2026-12-18', '14:00', 1)
+  and (select count(*) from public.entretiens) = 1, 'changement de créneau : un seul entretien');
+select pg_temp.ok(not public.reserver_entretien((select id from public.rapports), 'bbbbbbbb-0000-0000-0000-000000000002', '2026-12-18', '14:00', 1),
+  'créneau complet refusé');
+
 \echo 'Tous les tests SQL sont passés.'

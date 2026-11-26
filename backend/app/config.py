@@ -10,6 +10,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from .evenement import CRENEAUX, HORAIRES, JOURS, MINUTES_ENTRETIEN
+
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 PROJECT_DIR = BACKEND_DIR.parent
 WORD_DIR = PROJECT_DIR / "word"
@@ -25,7 +27,6 @@ DEFAULT_MODELS = [
     "baidu/ernie-5.5-flash-preview:free",
     "particle-ai/particle-1:free",
 ]
-DEFAULT_EVENT_DAYS = ["2026-12-16", "2026-12-17", "2026-12-18"]
 
 _SOFFICE_WINDOWS = [
     r"C:\Program Files\LibreOffice\program\soffice.exe",
@@ -135,7 +136,7 @@ class Settings:
         self.clamav_host = e("CLAMAV_HOST", "").strip()
         self.clamav_port = _int("CLAMAV_PORT", 3310)
         self.clamav_obligatoire = e("CLAMAV_OBLIGATOIRE", "0") == "1"
-        self.event_days = _csv("EVENT_DAYS", DEFAULT_EVENT_DAYS)
+        self.event_days = _csv("EVENT_DAYS", JOURS)
         self.workers = _int("WORKERS", 4)
 
         # Environnement Vercel : production | preview | development (vide en local)
@@ -150,13 +151,11 @@ class Settings:
         self.code_ttl, self.code_resend, self.code_max_tries = 600, 30, 3
         self.visitor_token_ttl = _int("VISITOR_TOKEN_HOURS", 12) * 3600
 
-        # Entretiens individuels : créneaux du front (K.SLOTS) ; le jeudi commence à 10h30
-        self.slots = _csv("ENTRETIEN_SLOTS", ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "14:00", "14:30",
-                                              "15:00", "15:30", "16:00", "16:30"])
-        self.slot_min_by_day = {"2026-12-17": "10:30"}
-        self.slot_capacity = _int("ENTRETIEN_CAPACITE", 1)
-        self.slot_minutes = 30
-        self.event_hours = {"2026-12-16": ("08:30", "17:30"), "2026-12-17": ("10:30", "17:30"), "2026-12-18": ("08:30", "17:00")}
+        # Entretiens individuels : créneaux par jour (evenement.py) ; capacité = nombre d'experts présents
+        self.slots = CRENEAUX
+        self.slot_capacity = _int("ENTRETIEN_CAPACITE", 3)
+        self.slot_minutes = MINUTES_ENTRETIEN
+        self.event_hours = HORAIRES
         self.event_location = e("EVENT_LOCATION", "Siège du Cabinet DC KNOWING, Cocody Riviera 2, Collège André Malraux, Abidjan")
 
         # Sécurité
