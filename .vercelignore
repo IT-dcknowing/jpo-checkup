@@ -8,3 +8,5 @@ word/node_modules
 *.md
 !checkup360-front/**/README.md
 SPEC_TECHNIQUE_*.txt
+# Outillage de la CI seulement : sa présence ferait ignorer requirements.txt à Vercel (aucune dépendance installée)
+pyproject.toml
