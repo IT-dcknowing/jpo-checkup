@@ -152,8 +152,38 @@ def _est_total(ligne: list) -> bool:
     return any(isinstance(c, str) and re.search(r"\b(sous[- ]?)?total\b|\bcumul\b|\breport\b", _norm(c)) for c in ligne)
 
 
-def _somme(t: Table, j: int) -> float:
-    return sum(x for ligne in t.lignes if j < len(ligne) and not _est_total(ligne) and (x := _num(ligne[j])) is not None)
+def _somme(t: Table, j: int, garde=None) -> float:
+    """Somme d'une colonne, hors lignes de total et hors lignes écartées par `garde` (filtre de période)."""
+    return sum(x for ligne in t.lignes if j < len(ligne) and not _est_total(ligne) and (garde is None or garde(ligne))
+               and (x := _num(ligne[j])) is not None)
+
+
+def _col_date(t: Table) -> int | None:
+    return _col(t.entetes, r"^date", r"date", r"^periode", r"^mois")
+
+
+def _dates(t: Table) -> list[date]:
+    j = _col_date(t)
+    return [d for r in t.lignes if j is not None and j < len(r) and not _est_total(r) and (d := _date(r[j]))]
+
+
+def choisir_exercice(dates: list[date]) -> tuple[date, date, str] | None:
+    """Fenêtre à analyser quand les fichiers couvrent plus d'un exercice : dernière année civile couverte
+    sur au moins 10 mois, sinon les 12 derniers mois. None si la période tient déjà en 13 mois."""
+    if not dates:
+        return None
+    lo, hi = min(dates), max(dates)
+    if (hi - lo).days <= 400:
+        return None
+    mois = {}
+    for d in dates:
+        mois.setdefault(d.year, set()).add(d.month)
+    for seuil in (12, 10):  # d'abord la dernière année complète, sinon une année presque complète
+        for an in sorted(mois, reverse=True):
+            if len(mois[an]) >= seuil:
+                return date(an, 1, 1), date(an, 12, 31), f"exercice {an}"
+    debut = date(hi.year - 1, hi.month, 1) if hi.month < 12 else date(hi.year, 1, 1)
+    return debut, hi, "12 derniers mois"
 
 
 def _col_compte(t: Table) -> int | None:
@@ -210,11 +240,10 @@ class Comprehension:
         else:
             self.faits[cle] = f
 
-    def periode(self, t: Table) -> None:
-        j = _col(t.entetes, r"^date", r"date")
-        if j is None:
-            return
-        ds = [d for r in t.lignes if j < len(r) and (d := _date(r[j]))]
+    def periode(self, t: Table, fenetre=None) -> None:
+        ds = _dates(t)
+        if fenetre:
+            ds = [d for d in ds if fenetre[0] <= d <= fenetre[1]]
         if ds:
             self.debut = min([d for d in (self.debut, min(ds)) if d])
             self.fin = max([d for d in (self.fin, max(ds)) if d])
@@ -232,23 +261,30 @@ class Comprehension:
         return "\n".join(lignes)
 
 
-def _montant_ht(t: Table, tva_exoneree: bool) -> tuple[float, str] | None:
+def _montant_ht(t: Table, tva_exoneree: bool, garde=None) -> tuple[float, str] | None:
     """Somme hors taxes d'un journal : colonne HT, sinon TTC ramené au HT (TVA 18 %), sinon colonne montant."""
     j = _col(t.entetes, r"\bht\b", r"hors tax", r"base (imposable|ht)", sauf=(r"tva", r"ttc"))
     if j is not None:
-        return _somme(t, j), f"colonne « {t.entetes[j]} »"
+        return _somme(t, j, garde), f"colonne « {t.entetes[j]} »"
     j = _col(t.entetes, r"\bttc\b", r"toutes taxes")
     if j is not None:
-        s = _somme(t, j)
+        s = _somme(t, j, garde)
         return (s, f"colonne « {t.entetes[j]} » (TVA exonérée)") if tva_exoneree else (s / (1 + TVA), f"colonne « {t.entetes[j]} » ÷ 1,18")
     j = _col(t.entetes, r"^montant", r"montant", r"^total", r"^valeur", sauf=(r"tva", r"taxe"))
     if j is not None:
-        return _somme(t, j), f"colonne « {t.entetes[j]} »"
+        return _somme(t, j, garde), f"colonne « {t.entetes[j]} »"
     return None
 
 
-def _journal(c: Comprehension, t: Table, genre: str, tva_exoneree: bool) -> None:
-    c.periode(t)
+def _journal(c: Comprehension, t: Table, genre: str, tva_exoneree: bool, fenetre=None) -> None:
+    jd = _col_date(t)
+    garde = None
+    if fenetre and jd is not None:
+        lo, hi = fenetre[0], fenetre[1]
+        def garde(r):  # lignes datées hors exercice écartées ; lignes sans date conservées
+            d = _date(r[jd]) if jd < len(r) else None
+            return d is None or lo <= d <= hi
+    c.periode(t, fenetre)
     if genre == "paie":
         brut = _col(t.entetes, r"salaire brut", r"\bbrut\b", r"brut imposable", sauf=(r"net",))
         patron = _col(t.entetes, r"charges? patronales?", r"part patronale", r"cotisations? employeur", r"charges? employeur")
@@ -257,25 +293,34 @@ def _journal(c: Comprehension, t: Table, genre: str, tva_exoneree: bool) -> None
             if j is None:
                 c.avertissements.append(f"{t.nom} : journal de paie sans colonne de salaire brut ni net")
                 return
-            total, src = _somme(t, j), f"colonne « {t.entetes[j]} » (salaires nets : sous-estime la masse salariale)"
+            total, src = _somme(t, j, garde), f"colonne « {t.entetes[j]} » (salaires nets : sous-estime la masse salariale)"
             conf = 0.65
         else:
-            total, src, conf = _somme(t, brut), f"colonne « {t.entetes[brut]} »", CONF_JOURNAL
+            total, src, conf = _somme(t, brut, garde), f"colonne « {t.entetes[brut]} »", CONF_JOURNAL
             if patron is not None:
-                total += _somme(t, patron)
+                total += _somme(t, patron, garde)
                 src += f" + « {t.entetes[patron]} »"
             else:
                 c.avertissements.append(f"{t.nom} : charges patronales absentes, masse salariale = salaires bruts seuls")
         if total > 0:
             c.ajouter(Fait("compte_resultat", "charges_personnel", total, conf, f"{t.nom}, {src}"))
         return
-    m = _montant_ht(t, tva_exoneree)
+    m = _montant_ht(t, tva_exoneree, garde)
     if not m or m[0] <= 0:
         c.avertissements.append(f"{t.nom} : aucune colonne de montant exploitable")
         return
     total, src = m
     if genre == "ventes":
         c.ajouter(Fait("compte_resultat", "chiffre_affaires_ht", total, CONF_JOURNAL, f"{t.nom}, {src}"))
+        if fenetre and fenetre[2].startswith("exercice") and jd is not None:  # année précédente : CA N-1
+            an = fenetre[0].year - 1
+            if len({d.month for d in _dates(t) if d.year == an}) >= 10:
+                def garde_n1(r):
+                    d = _date(r[jd]) if jd < len(r) else None
+                    return d is not None and d.year == an
+                m1 = _montant_ht(t, tva_exoneree, garde_n1)
+                if m1 and m1[0] > 0:
+                    c.ajouter(Fait("compte_resultat", "chiffre_affaires_n1", m1[0], CONF_JOURNAL, f"{t.nom}, {m1[1]}, année {an}"))
     else:
         c.ajouter(Fait("compte_resultat", "cout_achats_marchandises", total, CONF_JOURNAL - 0.1, f"{t.nom}, {src}"))
         c.avertissements.append(f"{t.nom} : achats comptés en marchandises (le journal ne distingue pas marchandises et matières)")
@@ -341,8 +386,10 @@ def _balance(c: Comprehension, t: Table) -> None:
 
 
 def comprendre(fichiers: list[tuple[str, Path]], tva_exoneree: bool = False) -> Comprehension:
-    """fichiers : [(nom d'origine, chemin local)]."""
+    """fichiers : [(nom d'origine, chemin local)]. Deux passes : reconnaissance des tableaux, puis choix de
+    l'exercice (si les journaux couvrent plusieurs années) et calcul des totaux sur cet exercice."""
     c = Comprehension()
+    reconnus: list[tuple[Table, str]] = []
     for nom, path in fichiers:
         try:
             tables = tables_de(nom, read_tables(path))
@@ -354,9 +401,18 @@ def comprendre(fichiers: list[tuple[str, Path]], tva_exoneree: bool = False) -> 
             libelle = {"balance": "balance", "grand_livre": "grand livre", "ventes": "journal des ventes", "achats": "journal des achats",
                        "paie": "journal de paie", "autre": "tableau non reconnu"}[genre]
             c.documents.append(f"{t.nom} : {libelle} ({len(t.lignes)} lignes)")
-            if genre in ("balance", "grand_livre"):
-                c.periode(t)
-                _balance(c, t)
-            elif genre in ("ventes", "achats", "paie"):
-                _journal(c, t, genre, tva_exoneree)
+            reconnus.append((t, genre))
+    journaux = [(t, g) for t, g in reconnus if g in ("ventes", "achats", "paie")]
+    # l'exercice se lit d'abord sur les ventes, sinon sur tous les journaux
+    dates = [d for t, g in journaux if g == "ventes" for d in _dates(t)] or [d for t, _ in journaux for d in _dates(t)]
+    fenetre = choisir_exercice(dates)
+    if fenetre:
+        c.avertissements.append(f"les journaux couvrent du {min(dates).isoformat()} au {max(dates).isoformat()} : "
+                                f"{fenetre[2]} retenu ({fenetre[0].isoformat()} au {fenetre[1].isoformat()})")
+    for t, genre in reconnus:
+        if genre in ("balance", "grand_livre"):
+            c.periode(t)
+            _balance(c, t)
+        elif genre in ("ventes", "achats", "paie"):
+            _journal(c, t, genre, tva_exoneree, fenetre)
     return c

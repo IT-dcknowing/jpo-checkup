@@ -212,7 +212,7 @@ def test_admin_flow(client, tok):
 
 def test_meta(client):
     m = client.get("/api/meta").json()
-    assert m["fichiers_max"] == 3 and m["taille_max_mo"] == 20
+    assert m["fichiers_max"] == 10 and m["taille_max_mo"] == 20
 
 
 def test_documents_without_financial_statements_get_a_clear_message(settings):

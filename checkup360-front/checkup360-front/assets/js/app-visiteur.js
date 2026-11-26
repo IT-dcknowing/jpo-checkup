@@ -22,7 +22,8 @@ class Component extends DCLogic {
       FNE: [['ACTIVE', 'Activée'], ['EN_COURS_ACTIVATION', 'Activation en cours'], ['NON_ACTIVE', 'Non activée'], ['NE_SAIT_PAS', 'Je ne sais pas']],
       STAT: [['A_JOUR', 'À jour'], ['EN_RETARD', 'En retard'], ['NE_SAIT_PAS', 'Ne sait pas']],
       OBL: [['DGI', 'Déclarations fiscales'], ['CNPS', 'Cotisations sociales'], ['ITS', 'Impôt sur traitements et salaires'], ['CMU', 'Couverture maladie universelle'], ['DISA', 'Déclaration individuelle des salaires annuels']],
-      DOCS: [['balance', 'Balance générale', 'Le plus complet : il suffit souvent à lui seul.', true], ['cr', 'Compte de résultat', 'Chiffre d’affaires, achats, charges et résultat.', false], ['bilan', 'Bilan', 'Actif, passif, trésorerie et dettes.', false], ['autre', 'Autre document', 'Journal de ventes, d’achats ou de paie, grand livre : diagnostic partiel.', false]],
+      MAX_FILES: 10,
+      DOCS: [['balance', 'Balance générale', 'Le plus complet : il suffit souvent à lui seul.', true], ['cr', 'Compte de résultat', 'Chiffre d’affaires, achats, charges et résultat.', false], ['bilan', 'Bilan', 'Actif, passif, trésorerie et dettes.', false], ['autre', 'Autres documents', 'Plusieurs fichiers possibles : journaux de ventes, d’achats, de paie, grand livre…', false]],
       STEPS: [
         ['Entreprise', 'Votre entreprise', 'Ces informations identifient le dossier et choisissent les repères adaptés à votre secteur.'],
         ['Vous', 'Vous et votre visite', 'Pour vous rappeler si besoin et préparer votre invitation au bon jour.'],
@@ -196,15 +197,24 @@ class Component extends DCLogic {
     if (this.state.step < 6) this.setState((s) => ({ step: s.step + 1, err: {} }));
     else this.launch();
   }
+  /* Case « Autre document » : plusieurs fichiers (sélection multiple ou glisser-déposer) */
+  putFiles(slot, list) {
+    const arr = Array.from(list || []);
+    if (slot !== 'autre') { this.putFile(slot, arr[0]); return; }
+    arr.forEach((fl) => this.putFile('autre:' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), fl));
+  }
   putFile(slot, fl) {
     if (!fl) return;
+    const MAX = this.K.MAX_FILES;
     const ext = (fl.name.split('.').pop() || '').toLowerCase();
     if (!['csv', 'xlsx', 'pdf'].includes(ext)) { this.toast('bad', 'Format non accepté', fl.name + ' : CSV, XLSX ou PDF uniquement.'); this.setState({ dragSlot: null }); return; }
     if (fl.size > 20 * 1024 * 1024) { this.toast('bad', 'Fichier trop lourd', fl.name + ' dépasse 20 Mo.'); this.setState({ dragSlot: null }); return; }
     const files = { ...this.state.files };
-    if (!files[slot] && Object.keys(files).length >= 3) { this.toast('bad', 'Maximum atteint', '3 fichiers par diagnostic.'); return; }
+    if (!files[slot] && Object.keys(files).length >= MAX) { this.toast('bad', 'Maximum atteint', MAX + ' fichiers par diagnostic.'); this.setState({ dragSlot: null }); return; }
+    if (Object.values(files).some((x) => x.name === fl.name && x.size === fl.size)) { this.toast('info', 'Déjà ajouté', fl.name); this.setState({ dragSlot: null }); return; }
     files[slot] = { name: fl.name, size: fl.size, ext };
     this.fileObjs[slot] = fl;
+    this.state.files = files; // plusieurs ajouts dans le même tour (sélection multiple)
     this.setState((s) => ({ files, dragSlot: null, err: { ...s.err, files: null } }));
     this.toast('ok', 'Fichier ajouté', fl.name);
   }
@@ -324,18 +334,19 @@ class Component extends DCLogic {
       { t: 'Obligations', edit: goStep(4), editL: 'Modifier les obligations', rows: K.OBL.map(([k]) => ({ l: k, v: f.statuts[k] ? label(K.STAT, f.statuts[k]) : '—' })) },
       { t: 'Documents', edit: goStep(5), editL: 'Modifier les documents', rows: fileList.length ? fileList.map((x) => ({ l: x.ext.toUpperCase(), v: x.name })) : [{ l: 'Fichiers', v: 'Aucun' }] }
     ];
-    const summary = [{ l: 'Entreprise', v: f.raison || '—' }, { l: 'Secteur', v: f.secteur || '—' }, { l: 'Visite', v: label(K.JOUR, f.jour) }, { l: 'E-mail', v: userEmail || '—' }, { l: 'Fichiers', v: fileList.length + ' / 3' }];
-    const full = fileList.length >= 3;
-    const docSlots = K.DOCS.map(([k, l, d, rec]) => {
+    const summary = [{ l: 'Entreprise', v: f.raison || '—' }, { l: 'Secteur', v: f.secteur || '—' }, { l: 'Visite', v: label(K.JOUR, f.jour) }, { l: 'E-mail', v: userEmail || '—' }, { l: 'Fichiers', v: fileList.length + ' / ' + K.MAX_FILES }];
+    const full = fileList.length >= K.MAX_FILES;
+    const autres = Object.keys(s.files).filter((k) => k.startsWith('autre:'));
+    const docSlots = K.DOCS.flatMap(([k0, l, d, rec]) => (k0 === 'autre' ? [...autres, 'autre'] : [k0]).map((k) => {
       const x = s.files[k];
-      const pick = (e) => { this.putFile(k, e.target.files && e.target.files[0]); e.target.value = ''; };
+      const pick = (e) => { this.putFiles(k, e.target.files); e.target.value = ''; };
       return { k, l, d, rec, isFilled: !!x, isEmpty: !x && !full, isOff: !x && full, over: s.dragSlot === k ? 'over' : '', aria: 'Déposer : ' + l, replaceAria: 'Remplacer ' + l, removeAria: 'Retirer ' + l,
         name: x ? x.name : '', size: x ? this.fmtSize(x.size) : '', ext: x ? x.ext.toUpperCase() : '', pick,
         dragOver: (e) => { e.preventDefault(); if (s.dragSlot !== k) this.setState({ dragSlot: k }); },
         dragLeave: (e) => { e.preventDefault(); this.setState({ dragSlot: null }); },
-        drop: (e) => { e.preventDefault(); this.putFile(k, e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]); },
+        drop: (e) => { e.preventDefault(); this.putFiles(k, e.dataTransfer && e.dataTransfer.files); },
         remove: () => { delete this.fileObjs[k]; this.setState((st) => { const files = { ...st.files }; delete files[k]; return { files }; }); } };
-    });
+    }));
     const remainMin = Math.max(1, Math.round((6 - s.step) * 0.5 + 0.5));
 
     const pct = s.done ? 100 : Math.min(99, s.pct);

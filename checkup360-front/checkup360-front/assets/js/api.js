@@ -233,10 +233,10 @@
           var type = MIME[ext] || f.type || 'application/octet-stream';
           return sb.storage.from('documents').upload(chemin, f, { contentType: type, upsert: false }).then(function (r) {
             if (r.error) throw frError(r.error, 'Envoi du fichier « ' + f.name + ' » impossible.');
-            return sb.from('documents').insert({ user_id: uid, nom_fichier: f.name.slice(0, 200), chemin: chemin, taille: f.size, type: type, categorie: slot }).select('id').single();
+            return sb.from('documents').insert({ user_id: uid, nom_fichier: f.name.slice(0, 200), chemin: chemin, taille: f.size, type: type, categorie: slot.split(':')[0] }).select('id').single();
           }).then(function (r) {
             if (r.error) throw frError(r.error, 'Enregistrement du fichier « ' + f.name + ' » impossible.');
-            return { id: r.data.id, type: slot };
+            return { id: r.data.id, type: slot.split(':')[0] };
           });
         }));
       }).then(function (docs) {

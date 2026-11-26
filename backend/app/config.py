@@ -116,7 +116,7 @@ class Settings:
 
         # Dépôts
         self.max_upload_bytes = _int("MAX_UPLOAD_MB", 20) * 1024 * 1024
-        self.max_files = _int("MAX_FILES", 3)
+        self.max_files = _int("MAX_FILES", 10)
         self.rate_limit = _int("RATE_LIMIT_PER_HOUR", 5)
         self.event_days = _csv("EVENT_DAYS", DEFAULT_EVENT_DAYS)
         self.workers = _int("WORKERS", 4)

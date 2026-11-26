@@ -9,7 +9,7 @@ from app.llm import LLMError
 from app.main import create_app
 from conftest import FakeLLM
 from fake_supabase import FakeSupabase
-from test_api import auth, deposer_fichier, depot, traiter
+from test_api import auth, client, deposer_fichier, depot, tok, traiter  # noqa: F401 (fixtures)
 
 F = Path(__file__).parent / "fichiers"
 JOURNAUX = ["journal_ventes.xlsx", "journal_achats.xlsx", "journal_paie.xlsx"]
@@ -88,3 +88,36 @@ def test_prompt_ia_recoit_la_synthese_anonymisee(settings):
         tok = sb.add_user("x@exemple.ci")
         traiter(c, tok, _deposer_journaux(c, tok))
         assert "SYNTHÈSE CALCULÉE PAR LE SERVEUR" in llm.prompts[0] and "1871300000" in llm.prompts[0]
+
+
+def _journal_ventes(chemin, debut, mois):
+    import datetime as dt
+    from openpyxl import Workbook
+    w = Workbook(); ws = w.active; ws.append(["Date", "Facture", "Client", "Montant HT"])
+    for m in range(mois):
+        an, mo = debut[0] + (debut[1] - 1 + m) // 12, (debut[1] - 1 + m) % 12 + 1
+        ws.append([dt.date(an, mo, 15), f"F{m}", "Client", 1_000_000 * (an - 2023)])  # 2024 : 1 M/mois, 2025 : 2 M, 2026 : 3 M
+    w.save(chemin)
+
+
+def test_journal_sur_plusieurs_annees_retient_le_dernier_exercice_complet(tmp_path):
+    """Le cas réel : ventes de janvier 2025 à novembre 2026 -> exercice 2025 retenu, pas 23 mois additionnés."""
+    _journal_ventes(tmp_path / "ventes.xlsx", (2025, 1), 23)
+    c = comprendre([("01_Journal_des_Ventes.xlsx", tmp_path / "ventes.xlsx")])
+    f = {k[1]: round(v.valeur) for k, v in c.faits.items()}
+    assert f["chiffre_affaires_ht"] == 12 * 2_000_000                # 2025 seulement (2026 n'a que 11 mois)
+    assert "chiffre_affaires_n1" not in f                            # pas de 2024 dans le fichier
+    assert str(c.debut) == "2025-01-15" and str(c.fin) == "2025-12-15"
+    assert any("exercice 2025 retenu" in a for a in c.avertissements)
+
+
+def test_deux_annees_completes_donnent_le_ca_n1(tmp_path):
+    _journal_ventes(tmp_path / "ventes.xlsx", (2024, 1), 24)
+    f = {k[1]: round(v.valeur) for k, v in comprendre([("ventes.xlsx", tmp_path / "ventes.xlsx")]).faits.items()}
+    assert f["chiffre_affaires_ht"] == 24_000_000 and f["chiffre_affaires_n1"] == 12_000_000
+
+
+def test_jusqu_a_dix_fichiers(client, tok):
+    docs = [{"id": deposer_fichier(client.sb, tok, nom=f"journal_{i}.csv"), "type": "autre"} for i in range(11)]
+    assert depot(client, tok, docs=docs).status_code == 422          # 11 : refusé
+    assert depot(client, tok, docs=docs[:10]).status_code == 202     # 10 : accepté

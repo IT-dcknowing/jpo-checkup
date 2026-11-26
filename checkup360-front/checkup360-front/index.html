@@ -317,21 +317,21 @@
 <sc-if value="{{show.s5}}" hint-placeholder-val="{{false}}">
 <div class="up" style="display: flex; flex-direction: column; gap: 14px">
 <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
-<span class="bdg {{fileCountCls}}">{{fileCount}} / 3 fichiers</span>
+<span class="bdg {{fileCountCls}}">{{fileCount}} / 10 fichiers</span>
 <sc-if value="{{showSampleFiles}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-t btn-sm" onClick="{{sampleFiles}}">Utiliser des fichiers d’exemple</button></sc-if>
 </div>
 <sc-for list="{{docSlots}}" as="d" hint-placeholder-count="4">
 <div>
 <sc-if value="{{d.isEmpty}}" hint-placeholder-val="{{true}}">
 <label class="slot {{d.over}}" onDragOver="{{d.dragOver}}" onDragEnter="{{d.dragOver}}" onDragLeave="{{d.dragLeave}}" onDrop="{{d.drop}}">
-<input class="vh" type="file" accept=".csv,.xlsx,.pdf" onChange="{{d.pick}}" aria-label="{{d.aria}}">
+<input class="vh" type="file" accept=".csv,.xlsx,.pdf" multiple onChange="{{d.pick}}" aria-label="{{d.aria}}">
 <span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"></path></svg></span>
 <span style="flex: 1; min-width: 0"><span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><b style="font-size: 15px">{{d.l}}</b><sc-if value="{{d.rec}}" hint-placeholder-val="{{false}}"><span class="bdg b-acc" style="padding: 1px 8px">Recommandé</span></sc-if></span><span class="hint" style="display: block">{{d.d}}</span></span>
 <span class="btn btn-g btn-sm" aria-hidden="true">Choisir</span>
 </label>
 </sc-if>
 <sc-if value="{{d.isOff}}" hint-placeholder-val="{{false}}">
-<div class="slot off"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"></path></svg></span><span style="flex: 1"><b style="font-size: 15px">{{d.l}}</b><span class="hint" style="display: block">Maximum de 3 fichiers atteint.</span></span></div>
+<div class="slot off"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"></path></svg></span><span style="flex: 1"><b style="font-size: 15px">{{d.l}}</b><span class="hint" style="display: block">Maximum de 10 fichiers atteint.</span></span></div>
 </sc-if>
 <sc-if value="{{d.isFilled}}" hint-placeholder-val="{{false}}">
 <div class="slot filled">
