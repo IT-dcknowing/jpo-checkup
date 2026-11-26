@@ -1,7 +1,7 @@
 """Invitation agenda (.ics). Abidjan est en UTC+0 sans changement d'heure : les heures sont écrites en UTC (suffixe Z)."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 
 def _esc(text: str) -> str:
@@ -23,11 +23,11 @@ def _fold(line: str) -> str:
 
 def _utc(jour: str, hhmm: str) -> str:
     h, m = hhmm.split(":")
-    return datetime.fromisoformat(jour).replace(hour=int(h), minute=int(m), tzinfo=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return datetime.fromisoformat(jour).replace(hour=int(h), minute=int(m), tzinfo=UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
 def build_ics(uid_base: str, jour: str, debut: str, fin: str, lieu: str, entretien: str | None = None, minutes: int = 30) -> bytes:
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     events = [(f"{uid_base}-jpo", "Journées Portes Ouvertes DC-KNOWING", _utc(jour, debut), _utc(jour, fin),
                "Journées Portes Ouvertes DC-KNOWING : Check-up 360, entretiens individuels et présentation de La Suite Flow."
                + (f" Votre entretien individuel est à {entretien}." if entretien else ""))]

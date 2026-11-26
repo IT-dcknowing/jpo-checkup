@@ -16,7 +16,11 @@ Pour corriger le texte à la main (ou par une IA) : modifier sortie.md, puis
     node md_vers_word.js sortie.md sortie.docx
 La mise en page reste identique. Syntaxe : GUIDE_MARKDOWN.txt.
 """
-import json, subprocess, sys, shutil, tempfile
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 ICI = Path(__file__).resolve().parent
@@ -148,7 +152,7 @@ def page1(e, k, perf, conf, nonconf, compact):
     else:
         retenir.append("**Vos obligations fiscales et sociales sont à jour.** Continuez ainsi : c'est une vraie protection en cas de contrôle.")
 
-    out = [f"# Le diagnostic de votre entreprise", "",
+    out = ["# Le diagnostic de votre entreprise", "",
            f"**{e['nom_affiche']}** · {e.get('effectif', '?')} salariés · Exercice {k['_annee']} · Rapport remis le {date_fr(e['jour_evenement'])}", "",
            "```scores",
            f"Santé financière | {perf['score']} | {perf['grade']} | {phr_perf}",

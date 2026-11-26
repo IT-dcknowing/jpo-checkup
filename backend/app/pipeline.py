@@ -7,13 +7,14 @@ import re
 import tempfile
 from pathlib import Path
 
-from . import report
-from .comprehension import comprendre
+from . import antivirus, report
 from .anonymize import anonymize
+from .comprehension import comprendre
 from .config import Settings
 from .db import TERMINAUX, Database, now_iso
 from .extraction import DocumentsNonReconnus, Extraction, LectureImpossible, extract
 from .llm import LLMClient, LLMError
+from .pseudonymise import Pseudonymes, pseudonymiser_pdf, pseudonymiser_tableaux
 from .readers import ReaderError, read_file
 from .schemas import ND, DepotForm
 from .supa import Supabase, SupabaseError
@@ -77,11 +78,24 @@ class Pipeline:
                                                  "t": now_iso()})
 
     def _purge_uploads(self, job_id: str) -> None:
-        """Les fichiers bruts ne servent plus après l'analyse : supprimés du stockage (la ligne documents reste comme trace)."""
+        """Les fichiers bruts ne servent plus après l'analyse (le résultat de l'IA est enregistré) : fichiers et lignes
+        documents supprimés. Une relance repart du résultat enregistré."""
         try:
-            self.sb.remove("documents", [d["chemin"] for d in self.db.job_documents(job_id)])
+            docs = self.db.job_documents(job_id)
+            self.sb.remove("documents", [d["chemin"] for d in docs])
+            self.db.delete_documents([d["id"] for d in docs])
         except SupabaseError:
             log.exception("job %s : suppression des fichiers bruts en échec (purge quotidienne en filet)", job_id)
+
+    def _email(self, body: dict, user_token: str | None) -> None:
+        """Appel de l'Edge Function d'envoi ; désactivé sur les préversions (EMAILS_PREVIEW=1 pour l'autoriser)."""
+        if not self.s.emails_actifs:
+            raise RuntimeError("e-mails désactivés sur les préversions (EMAILS_PREVIEW)")
+        self.sb.invoke("envoyer-rapport", body, user_token)
+
+    def note_reprise(self, job_id: str, tentative: int) -> None:
+        job = self.db.get_job(job_id) or {"progression": 5, "statut": "EN_ATTENTE"}
+        self._log(job_id, job["statut"], job["progression"], f"Reprise automatique du traitement (tentative {tentative})")
 
     # ------------------------------------------------------------------ point d'entrée
     def process(self, job_id: str, user_token: str | None = None) -> None:
@@ -118,7 +132,7 @@ class Pipeline:
         self.db.update_job(job["id"], erreur=detail[:1500], erreur_publique=public, completed_at=now_iso())
         self._log(job["id"], "ERREUR", pct, public, "erreur")
         try:  # e-mail d'excuse (le conseiller est en copie)
-            self.sb.invoke("envoyer-rapport", {"rapport_id": job["id"], "type": "excuse", "motif": motif}, user_token)
+            self._email({"rapport_id": job["id"], "type": "excuse", "motif": motif}, user_token)
         except Exception:  # noqa: BLE001
             log.exception("job %s : e-mail d'excuse non envoyé", job["id"])
 
@@ -131,6 +145,7 @@ class Pipeline:
         self._log(job_id, "LECTURE", 3, f"Fichiers reçus : {len(fichiers)} document{'s' if len(fichiers) > 1 else ''}")
         textes, avertissements, genres = [], [], []
         locaux: list[tuple[str, Path]] = []
+        pseudo, total = Pseudonymes(), 0
         with tempfile.TemporaryDirectory(prefix="jpo-") as tmp:
             for i, f in enumerate(fichiers):
                 ext = Path(f["nom_fichier"]).suffix.lower()
@@ -140,6 +155,14 @@ class Pipeline:
                     data = self.sb.download("documents", f["chemin"])
                 except SupabaseError as e:
                     raise ReaderError(f"fichier « {f['nom_fichier']} » introuvable (supprimé après 24 h)") from e
+                total += len(data)
+                if len(data) > self.s.max_upload_bytes or total > self.s.max_total_bytes:
+                    raise ReaderError(f"fichiers trop volumineux ({total // (1024 * 1024)} Mo au total, "
+                                      f"{self.s.max_total_bytes // (1024 * 1024)} Mo maximum)")
+                try:  # contenu actif (macros, JavaScript) et antivirus, avant toute lecture
+                    antivirus.verifier(data, f["nom_fichier"], ext, self.s.clamav_host, self.s.clamav_port, self.s.clamav_obligatoire)
+                except antivirus.FichierRefuse as e:
+                    raise ReaderError(str(e)) from e
                 path = Path(tmp) / f"{i}{ext}"
                 path.write_bytes(data)
                 locaux.append((f["nom_fichier"], path))
@@ -150,7 +173,18 @@ class Pipeline:
                 avertissements += [f"{f['nom_fichier']} : {w}" for w in r.warnings]
                 genres.append(r.kind.upper())
                 nature = TYPES_FICHIERS.get(f.get("categorie", ""), "document")
-                textes.append(f"=== FICHIER {i + 1} ({r.kind.upper()} · {nature}) ===\n{anonymize(r.text, form)}")
+                texte = r.text
+                if r.kind in ("csv", "xlsx", "pdf"):  # tiers (clients, fournisseurs, salariés) pseudonymisés, paie non transmise
+                    try:
+                        if r.kind == "pdf":
+                            texte = pseudonymiser_pdf(path, f["nom_fichier"], r.text, pseudo)
+                        else:
+                            texte = pseudonymiser_tableaux(path, f["nom_fichier"], pseudo) or "[tableau vide]"
+                    except Exception:  # noqa: BLE001 — en cas de doute, rien ne part
+                        log.exception("job %s : pseudonymisation impossible (%s)", job_id, f["nom_fichier"])
+                        texte = "[contenu non transmis : structure du tableau non analysée]"
+                        avertissements.append(f"{f['nom_fichier']} : contenu non transmis à l'IA (structure non analysée)")
+                textes.append(f"=== FICHIER {i + 1} ({r.kind.upper()} · {nature}) ===\n{anonymize(texte, form)}")
             comp = comprendre(locaux, form.tva_exoneree)  # type de chaque tableau et totaux exacts
         comp.documents = [anonymize(d, form) for d in comp.documents]  # noms de fichiers : peuvent contenir la raison sociale
         comp.avertissements = [anonymize(a, form) for a in comp.avertissements]
@@ -162,7 +196,7 @@ class Pipeline:
             self._log(job_id, "LECTURE", 20, f"Documents reconnus : {', '.join(types)}")
         if comp.faits:
             self._log(job_id, "LECTURE", 22, f"Totaux calculés sur vos fichiers : {len(comp.faits)} poste{'s' if len(comp.faits) > 1 else ''}")
-        self._log(job_id, "MAPPING_IA", 24, "Anonymisation : noms, NCC, RIB et téléphones remplacés")
+        self._log(job_id, "MAPPING_IA", 24, "Anonymisation : vos identifiants et les noms des tiers remplacés")
         ext_: Extraction = extract(self.llm, form, "\n\n".join(textes), self.s.context_max_chars, comp)
         ext_.ia["meta"]["warnings"] += avertissements
         self._log(job_id, "MAPPING_IA", 40, f"Extraction IA : confiance globale {fr_conf(ext_.confiance_globale)}")
@@ -201,11 +235,13 @@ class Pipeline:
         self.db.update_job(job_id, completed_at=now_iso())
 
         try:  # l'Edge Function vérifie la propriété, signe un lien de 7 jours, envoie l'e-mail et passe le statut à « envoye »
-            self.sb.invoke("envoyer-rapport", {"rapport_id": job_id}, user_token)
+            self._email({"rapport_id": job_id}, user_token)
         except Exception as e:  # noqa: BLE001 — le rapport existe : on ne perd pas le travail
             log.exception("job %s : envoi e-mail en échec", job_id)
             self.db.update_job(job_id, erreur=f"e-mail non envoyé : {str(e)[:300]}")
-            self._log(job_id, "TERMINE", 100, "Rapport prêt · disponible dans Mes diagnostics", "ok")
+            # le visiteur est prévenu : rapport prêt mais pas d'e-mail (niveau « alerte », pas « ok »)
+            self._log(job_id, "TERMINE", 100, "Rapport prêt, mais l'e-mail n'a pas pu partir : téléchargez-le ci-dessous "
+                                              "ou dans Mes diagnostics", "alerte")
             self.sb.update("rapports", {"id": f"eq.{job_id}"}, {"statut": "erreur"})  # rapport généré, envoi en échec
             return
         self._log(job_id, "ENVOYE", 100, "E-mail envoyé · ajouté à Mes diagnostics", "ok")
@@ -215,6 +251,6 @@ class Pipeline:
         job = self.db.get_job(job_id)
         if not job or not job["docx_path"]:
             raise ValueError("Le rapport n'existe plus : relancez le traitement.")
-        self.sb.invoke("envoyer-rapport", {"rapport_id": job_id})
+        self._email({"rapport_id": job_id}, None)
         if job["statut"] != "ENVOYE":
             self._log(job_id, "ENVOYE", 100, "E-mail renvoyé par un conseiller", "ok")

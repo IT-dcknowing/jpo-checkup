@@ -14,7 +14,15 @@
     del: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
   };
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-  function adminToken() { return store.get('ck_admin_token'); }
+  /* Session conseiller : le jeton est dans un cookie HttpOnly posé par le serveur (illisible ici). On ne garde, pour
+     l'affichage, qu'un indicateur « connecté » et le rôle, en sessionStorage (effacés à la fermeture de l'onglet). */
+  var adminStore = {
+    get: function (k) { try { return JSON.parse(sessionStorage.getItem(k)); } catch (e) { return null; } },
+    set: function (k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+    del: function (k) { try { sessionStorage.removeItem(k); localStorage.removeItem(k); } catch (e) {} }
+  };
+  try { localStorage.removeItem('ck_admin_token'); sessionStorage.removeItem('ck_admin_token'); } catch (e) {} /* anciens emplacements */
+  function adminToken() { return cfg.mock ? adminStore.get('ck_admin_token') : null; }
 
   /* ---------- Supabase : comptes visiteurs (code à 6 chiffres par e-mail) et dépôt des fichiers ---------- */
   var sb = (!cfg.mock && window.supabase && cfg.supabaseUrl && cfg.supabaseKey)
@@ -58,7 +66,7 @@
   function req(method, path, body, opts) {
     opts = opts || {};
     return (opts.admin ? Promise.resolve(adminToken()) : token()).then(function (t) {
-      var headers = { Accept: 'application/json' };
+      var headers = { Accept: 'application/json', 'X-Checkup': '1' };
       if (t) headers.Authorization = 'Bearer ' + t;
       var payload = body;
       if (body && !(body instanceof FormData)) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
@@ -123,7 +131,9 @@
         return { prio: p.priorite || p.prio, action: p.action, delai: p.delai, module: p.module || p.outil };
       }),
       alerte: d.alerte_principale || d.alerte || '',
-      entretien: d.entretien || null
+      entretien: d.entretien || null,
+      emailEnvoye: d.email_envoye !== false,
+      rapportDispo: d.rapport_disponible !== false
     };
   }
 
@@ -217,26 +227,18 @@
           return { job_id: id, reference: id };
         });
       }
-      /* 1. fichiers déposés directement dans Supabase Storage (bucket privé « documents », dossier de l'utilisateur)
-         2. une ligne par fichier dans public.documents (RLS : propriétaire uniquement)
+      /* 1. l'API vérifie formats, tailles et quotas AVANT tout envoi, crée les lignes documents et remet un jeton signé
+         2. chaque fichier part dans Supabase Storage avec son jeton (aucun autre dépôt n'est permis aux visiteurs)
          3. l'API crée le diagnostic à partir du formulaire et des identifiants de documents */
-      var MIME = { csv: 'text/csv', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', pdf: 'application/pdf' };
-      return sb.auth.getUser().then(function (u) {
-        if (!u.data || !u.data.user) { var e = new Error('Session expirée : reconnectez-vous avec un nouveau code.'); e.status = 401; throw e; }
-        var uid = u.data.user.id;
-        var slots = Object.keys(files || {}).filter(function (k) { return files[k]; });
-        return Promise.all(slots.map(function (slot) {
-          var f = files[slot];
-          var ext = (f.name.split('.').pop() || '').toLowerCase();
-          var id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
-          var chemin = uid + '/' + id + '.' + ext;
-          var type = MIME[ext] || f.type || 'application/octet-stream';
-          return sb.storage.from('documents').upload(chemin, f, { contentType: type, upsert: false }).then(function (r) {
-            if (r.error) throw frError(r.error, 'Envoi du fichier « ' + f.name + ' » impossible.');
-            return sb.from('documents').insert({ user_id: uid, nom_fichier: f.name.slice(0, 200), chemin: chemin, taille: f.size, type: type, categorie: slot.split(':')[0] }).select('id').single();
-          }).then(function (r) {
-            if (r.error) throw frError(r.error, 'Enregistrement du fichier « ' + f.name + ' » impossible.');
-            return { id: r.data.id, type: slot.split(':')[0] };
+      if (!sb) return Promise.reject(new Error('Configuration Supabase absente (config.js).'));
+      var slots = Object.keys(files || {}).filter(function (k) { return files[k]; });
+      var demande = slots.map(function (slot) { var f = files[slot]; return { nom: f.name.slice(0, 200), taille: f.size, categorie: slot.split(':')[0] }; });
+      return req('POST', '/fichiers', { fichiers: demande }).then(function (r) {
+        return Promise.all((r.fichiers || []).map(function (a, i) {
+          var f = files[slots[i]];
+          return sb.storage.from('documents').uploadToSignedUrl(a.chemin, a.jeton, f, { contentType: a.type }).then(function (u) {
+            if (u.error) throw frError(u.error, 'Envoi du fichier « ' + f.name + ' » impossible.');
+            return { id: a.id, type: slots[i].split(':')[0] };
           });
         }));
       }).then(function (docs) {
@@ -247,7 +249,9 @@
        onEvent({etape, progression, message, niveau}) ; retourne une fonction d'arrêt. */
     subscribe: function (id, onEvent) {
       if (cfg.mock) return mockStream(id, onEvent);
-      var stopped = false, next = 0, timer = null, fails = 0;
+      var stopped = false, next = 0, timer = null, fails = 0, debut = Date.now();
+      var MAX_MS = 14 * 60 * 1000; /* 2 tentatives de 5 min au plus (reprise automatique) + marge */
+      var derniereReprise = 0;
       var base = '/diagnostics/' + encodeURIComponent(id);
       req('POST', base + '/traiter', null, { keepalive: false }).catch(function () { /* le suivi continue : l'état est en base */ });
       function poll() {
@@ -259,6 +263,16 @@
           });
           next = d.suivant != null ? d.suivant : next;
           if (d.termine) { stopped = true; return; }
+          if (d.reprendre && Date.now() - derniereReprise > 30000) {
+            /* traitement coupé côté serveur : on le relance, il reprend à la dernière étape enregistrée */
+            derniereReprise = Date.now();
+            req('POST', base + '/traiter', null).catch(function () {});
+          }
+          if (Date.now() - debut > MAX_MS) {
+            stopped = true;
+            onEvent({ etape: 'ERREUR', progression: 0, niveau: 'erreur', message: 'Le traitement prend plus de temps que prévu. Un conseiller DC-KNOWING vous rappelle ; votre dossier reste visible dans Mes diagnostics.' });
+            return;
+          }
           timer = setTimeout(poll, 1500);
         }).catch(function (e) {
           if (e.status === 401 || e.status === 404) { stopped = true; onEvent({ etape: 'ERREUR', progression: 0, message: e.message, niveau: 'erreur' }); return; }
@@ -300,12 +314,18 @@
 
     /* -- Espace conseiller (JWT) -- */
     admin: {
-      login: function (email, password) {
-        if (cfg.mock) return sleep(800).then(function () { store.set('ck_admin_token', 'demo-admin'); return { ok: true }; });
-        return req('POST', '/admin/login', { email: email, password: password }).then(function (d) { store.set('ck_admin_token', d.token || d.access_token); return d; });
+      login: function (email, password, code) {
+        if (cfg.mock) return sleep(800).then(function () { adminStore.set('ck_admin_token', 'demo-admin'); return { ok: true }; });
+        var body = { email: email, password: password };
+        if (code) body.code = code;
+        return req('POST', '/admin/login', body, { admin: true }).then(function (d) { adminStore.set('ck_admin_logged', true); adminStore.set('ck_admin_role', d.role || 'conseiller'); return d; });
       },
-      logout: function () { store.del('ck_admin_token'); },
-      isLogged: function () { return !!adminToken(); },
+      logout: function () {
+        if (!cfg.mock) req('POST', '/admin/logout', null, { admin: true }).catch(function () {});
+        adminStore.del('ck_admin_token'); adminStore.del('ck_admin_logged'); adminStore.del('ck_admin_role');
+      },
+      role: function () { return adminStore.get('ck_admin_role') || 'conseiller'; },
+      isLogged: function () { return cfg.mock ? !!adminToken() : !!adminStore.get('ck_admin_logged'); },
       list: function (jour) { return req('GET', '/admin/diagnostics?jour=' + encodeURIComponent(jour), null, { admin: true }); },
       resend: function (id) { return req('POST', '/admin/diagnostics/' + encodeURIComponent(id) + '/renvoyer', null, { admin: true }); },
       retry: function (id) { return req('POST', '/admin/diagnostics/' + encodeURIComponent(id) + '/relancer', null, { admin: true }); },

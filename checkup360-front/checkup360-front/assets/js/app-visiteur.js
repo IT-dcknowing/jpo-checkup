@@ -246,8 +246,8 @@ class Component extends DCLogic {
     }).catch((e) => {
       this.setState({ busy: false });
       if (e.status === 401) this.expire();
-      else if (e.status === 413) this.toast('bad', 'Fichiers trop lourds', '20 Mo maximum par fichier.');
-      else if (e.status === 429) this.toast('bad', 'Trop de dépôts', 'Limite de 5 dépôts par heure atteinte.');
+      else if (e.status === 413) this.toast('bad', 'Fichiers trop lourds', e.message || '20 Mo par fichier, 50 Mo au total.');
+      else if (e.status === 429) this.toast('bad', 'Limite atteinte', e.message || 'Limite de 5 dépôts par heure atteinte.');
       else this.fail(e, 'Envoi impossible');
     });
   }
@@ -260,7 +260,7 @@ class Component extends DCLogic {
     const t0 = () => this.fmtT((Date.now() - start) / 1000);
     let rangSon = 0; // un son par étape majeure : Lecture, Analyse, Calcul, Rapport
     this.unsub = API.subscribe(id, (ev) => {
-      const kind = ev.niveau === 'erreur' || ev.etape === 'ERREUR' ? 'bad' : ev.niveau === 'ok' || ev.etape === 'ENVOYE' ? 'ok' : '';
+      const kind = ev.niveau === 'erreur' || ev.etape === 'ERREUR' ? 'bad' : ev.niveau === 'alerte' ? 'warn' : ev.niveau === 'ok' || ev.etape === 'ENVOYE' ? 'ok' : '';
       this.setState((s) => {
         const patch = { logs: ev.message ? [...s.logs, { id: s.logs.length + 1, time: t0(), text: ev.message, kind }] : s.logs };
         if (ev.progression != null) patch.pct = Math.max(s.pct, Math.min(100, Math.round(ev.progression)));
@@ -294,7 +294,8 @@ class Component extends DCLogic {
     }, 28);
     this.timers.push(iv);
     this.later(() => this.setState({ confetti: false }), 4600);
-    this.later(() => this.toast('ok', 'Rapport envoyé', 'Aussi disponible dans Mes diagnostics.'), 600);
+    if (d && d.emailEnvoye === false) this.later(() => this.toast('bad', 'E-mail non envoyé', 'Votre rapport est prêt : téléchargez-le avec le bouton « Télécharger le rapport » ou dans Mes diagnostics.'), 600);
+    else this.later(() => this.toast('ok', 'Rapport envoyé', 'Aussi disponible dans Mes diagnostics.'), 600);
   }
   openPdf(id, ref) {
     this.setState({ dl: id });
@@ -366,7 +367,7 @@ class Component extends DCLogic {
     });
     const elapsedSec = s.elapsed / 1000;
     const remainL = s.failed ? 'Traitement arrêté.' : s.done ? 'Terminé : ouverture de vos résultats…' : pct > 0 ? 'Temps restant estimé : environ ' + Math.max(1, Math.ceil((5.5 * 60 * (100 - pct) / 100) / 60)) + ' min' : 'Démarrage de l’analyse…';
-    const logs = s.logs.map((l) => ({ ...l, color: l.kind === 'bad' ? '#FCA5A5' : l.kind === 'ok' ? '#86EFAC' : '#FFFFFF' }));
+    const logs = s.logs.map((l) => ({ ...l, color: l.kind === 'bad' ? '#FCA5A5' : l.kind === 'warn' ? '#FCD34D' : l.kind === 'ok' ? '#86EFAC' : '#FFFFFF' }));
     const palette = ['#FFD700', '#000000', '#F2C200', '#FEF9E7', '#262626'];
     const confettiPieces = Array.from({ length: 34 }, (_, i) => ({ x: (i * 37 + 7) % 100, w: 6 + (i % 4) * 2, h: 10 + (i % 3) * 4, bg: palette[i % 5], d: ((i * 13) % 20) / 20 }));
     const slots = K.SLOTS.filter((t) => f.jour !== '2026-12-17' || t >= '10:30').map((t) => { const taken = (s.taken || []).includes(t); const sel = s.slotPick === t; return { t, dis: taken, cls: sel ? 'seg on-a' : 'seg', pressed: sel ? 'true' : 'false', aria: taken ? t + ', déjà réservé' : t, pick: () => this.setState({ slotPick: t }) }; });

@@ -344,7 +344,7 @@ def _balance(c: Comprehension, t: Table) -> None:
         compte = str(r[jc]).strip().split(".")[0]
         if not re.fullmatch(r"[1-9]\d{1,11}", compte):
             continue
-        val = lambda j: (_num(r[j]) or 0.0) if j is not None and j < len(r) else 0.0
+        val = lambda j, r=r: (_num(r[j]) or 0.0) if j is not None and j < len(r) else 0.0
         if sd is not None or sc is not None:
             s = val(sd) - val(sc)
         elif js is not None:

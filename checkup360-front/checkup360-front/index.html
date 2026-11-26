@@ -6,9 +6,7 @@
 <title>Check-up 360 — Journées Portes Ouvertes DC-KNOWING</title>
 <meta name="description" content="Diagnostic financier et conformité pendant les Journées Portes Ouvertes DC-KNOWING, 16–18 décembre 2026, Abidjan.">
 <link rel="icon" href="assets/img/logo-dc-knowing.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Sora:wght@600;700;800&amp;family=Poppins:ital,wght@0,500;0,700;0,800;0,900;1,400;1,500;1,700;1,800;1,900&amp;family=Mrs+Saint+Delafield&amp;display=swap" rel="stylesheet">
+<link href="assets/css/fonts.css" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jpo.css">
 </head>
 <body>
@@ -133,7 +131,7 @@
 <div style="flex: 1 1 460px; min-width: 0">
 <p class="micro" style="color: #FFD700">Confidentialité · loi n°2013-450</p>
 <h2 id="h-conf" style="font-size: 24px; color: #FFFFFF; margin-top: 8px">Vos chiffres restent les vôtres</h2>
-<p style="color: #D4D4D4; font-size: 15px; margin-top: 10px; max-width: 62ch">Noms, NCC, RIB et téléphones sont remplacés avant toute analyse. Les fichiers bruts sont supprimés après 24 h ; le rapport est conservé 30 jours, chiffré. L’IA extrait les données, les calculs sont faits par notre moteur.</p>
+<p style="color: #D4D4D4; font-size: 15px; margin-top: 10px; max-width: 62ch">Vos identifiants et les noms de vos clients, fournisseurs et salariés sont remplacés avant l’analyse par l’IA. Les fichiers bruts sont supprimés après l’analyse (24 h au plus) ; le diagnostic est supprimé après 30 jours. L’IA extrait les données, les calculs sont faits par notre moteur.</p>
 </div>
 <div style="display: flex; gap: 12px; flex-wrap: wrap">
 <button type="button" class="btn btn-l" onClick="{{openNotice}}">Lire la notice d’information</button>
@@ -639,7 +637,7 @@
 
 <section style="padding: 0 6px; display: flex; flex-direction: column; gap: 6px">
 <p class="micro muted">Mes données</p>
-<p class="hint">Fichiers bruts supprimés après 24 h. Rapports conservés 30 jours.</p>
+<p class="hint">Fichiers bruts supprimés après l’analyse (24 h au plus). Diagnostics supprimés après 30 jours.</p>
 <button type="button" class="btn btn-t btn-sm" onClick="{{askDelete}}" style="align-self: flex-start; margin-left: -12px; color: #DC2626">Supprimer mes données</button>
 </section>
 </aside>
@@ -674,9 +672,11 @@
 <p class="muted">Traitement réalisé par le cabinet DC-KNOWING dans le cadre de la loi n°2013-450 relative à la protection des données à caractère personnel (ARTCI).</p>
 <ul style="margin: 0; padding-left: 18px; display: grid; gap: 8px">
 <li><b>Finalité :</b> produire votre diagnostic financier et de conformité, puis préparer votre entretien.</li>
-<li><b>Anonymisation :</b> noms, NCC, RIB et téléphones sont remplacés avant tout appel à l’IA ; le prestataire IA est configuré sans collecte de données.</li>
-<li><b>Sécurité :</b> chiffrement au repos et en transit ; lecture des fichiers dans un environnement sans réseau ; journal d’audit de chaque accès.</li>
-<li><b>Conservation :</b> fichiers bruts supprimés après 24 h ; rapport conservé 30 jours puis archivé chiffré.</li>
+<li><b>Anonymisation :</b> avant tout appel à l’IA, votre raison sociale, votre NCC, vos nom, e-mail et téléphone, les RIB/IBAN, ainsi que les noms des clients, fournisseurs et salariés de vos documents sont remplacés par des codes ; le détail des journaux et bulletins de paie n’est jamais transmis (seuls les totaux le sont). Dans un PDF, un nom cité seul au fil du texte peut échapper à ce traitement : préférez CSV ou XLSX pour les journaux nominatifs.</li>
+<li><b>IA :</b> l’analyse passe par OpenRouter avec des modèles gratuits : les fournisseurs de ces modèles peuvent conserver et réutiliser les données transmises (les noms sont remplacés par des codes, les montants restent lisibles).</li>
+<li><b>Sous-traitants :</b> Supabase (base de données et fichiers), Vercel (application), OpenRouter (IA) et Resend (e-mails) ; certains traitements ont lieu hors de Côte d’Ivoire.</li>
+<li><b>Sécurité :</b> chiffrement en transit et au repos ; accès limité à votre compte ; les consultations, exports et actions des conseillers sont journalisés.</li>
+<li><b>Conservation :</b> fichiers bruts supprimés dès l’analyse terminée, et au plus tard après 24 h ; diagnostic et rapport supprimés après 30 jours ; journal des accès conservé 12 mois. Vous pouvez tout supprimer à tout moment depuis « Mes diagnostics ».</li>
 <li><b>Limites :</b> ce diagnostic n’est ni un audit, ni une certification des comptes, ni un avis juridique.</li>
 </ul>
 <p class="hint">Pour exercer vos droits : infos@dc-knowing.com · 27 22 42 14 43.</p>
@@ -795,6 +795,6 @@
 <script src="assets/js/api.js"></script>
 <script src="assets/js/sons.js"></script>
 <script src="assets/js/app-visiteur.js"></script>
-<script>Sons.init(); DC.mount(Component, 'tpl-visiteur', document.getElementById('app'), DC.queryProps());</script>
+<script src="assets/js/boot-visiteur.js"></script>
 </body>
 </html>

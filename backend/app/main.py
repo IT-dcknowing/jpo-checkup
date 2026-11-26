@@ -12,7 +12,7 @@ import hmac
 import io
 import logging
 import re
-import secrets
+import uuid
 from datetime import timedelta
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -23,13 +23,26 @@ from pydantic import ValidationError
 
 from . import ics
 from .config import Settings, get_settings
-from .db import TERMINAUX, Database, now_iso
+from .db import TERMINAUX, Database, DocumentsIndisponibles, QuotaDepasse, now_iso
 from .llm import LLMClient, OpenRouterClient
 from .pipeline import FRONT_ETAPE, TYPES_FICHIERS, Pipeline
 from .readers import ALLOWED_EXT
 from .schemas import SECTEURS, DepotForm
-from .security import RateLimiter, sign_token, verify_token
+from .security import (
+    RateLimiter,
+    account_fingerprint,
+    dummy_password_check,
+    is_hashed,
+    sign_token,
+    verify_password,
+    verify_token,
+    verify_totp,
+)
 from .supa import Supabase, SupabaseError
+
+MIME = {".csv": "text/csv", ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".pdf": "application/pdf"}
+ADMIN_COOKIE = "ck_admin"
+MSG_INTERROMPU = "Votre diagnostic n'a pas pu être produit automatiquement. Un conseiller DC-KNOWING vous rappelle très vite."
 
 log = logging.getLogger("jpo.api")
 UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
@@ -37,39 +50,86 @@ HEURE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 JOURS_LONGS = {"2026-12-16": "Mercredi 16 décembre 2026", "2026-12-17": "Jeudi 17 décembre 2026", "2026-12-18": "Vendredi 18 décembre 2026"}
 
 
-def purge(db: Database, sb: Supabase, s: Settings) -> dict:
-    """Rétention (spec §13) : fichiers bruts après 24 h, rapports après 30 jours ; traitements interrompus passés en erreur."""
-    docs = db.documents_older_than(timedelta(hours=s.retention_raw_hours))
-    sb.remove("documents", [d["chemin"] for d in docs])
-    n_rapports = 0
-    for job in db.jobs_older_than(timedelta(days=s.retention_report_days)):
-        if job["docx_path"] or job["md_path"]:
-            sb.remove("rapports", [p for p in (job["docx_path"], job["md_path"]) if p])
-            db.update_job(job["id"], docx_path=None, md_path=None)
-            n_rapports += 1
+def mark_interrupted(db: Database, job: dict) -> None:
+    """Traitement coupé (délai de la fonction Vercel dépassé) : dossier passé en erreur, le visiteur est prévenu."""
+    db.update_job(job["id"], erreur="traitement interrompu (délai de la fonction dépassé)", erreur_publique=MSG_INTERROMPU,
+                  completed_at=now_iso())
+    db.log_event(job["id"], "ERREUR", job["progression"], {"etape": "ERREUR", "progression": job["progression"],
+                 "message": "Traitement interrompu · un conseiller vous rappelle", "niveau": "erreur", "t": now_iso()})
+
+
+def purge(db: Database, sb: Supabase, s: Settings, max_lots: int = 200) -> dict:
+    """Rétention (notice, spec §13) :
+    - fichiers bruts : objets ET lignes documents supprimés après RETENTION_RAW_HOURS (24 h) ;
+    - dossiers : rapport Word/Markdown ET ligne rapports (formulaire, résultats, journal ; documents et entretiens en
+      cascade) supprimés après RETENTION_REPORT_DAYS (30 jours) ;
+    - journal d'audit : lignes de plus de RETENTION_AUDIT_DAYS supprimées ;
+    - traitements interrompus passés en erreur.
+    Lecture par lots supprimés au fur et à mesure : jamais tronquée par la limite max_rows de PostgREST."""
+    n_docs = n_rapports = 0
+    for _ in range(max_lots):
+        docs = db.old_documents_batch(timedelta(hours=s.retention_raw_hours))
+        if not docs:
+            break
+        sb.remove("documents", [d["chemin"] for d in docs])
+        db.delete_documents([d["id"] for d in docs])
+        n_docs += len(docs)
+    for _ in range(max_lots):
+        jobs = db.old_jobs_batch(timedelta(days=s.retention_report_days))
+        if not jobs:
+            break
+        sb.remove("rapports", [p for j in jobs for p in (j["chemin_fichier"], j["chemin_markdown"]) if p])
+        db.delete_jobs([j["id"] for j in jobs])
+        n_rapports += len(jobs)
+    db.purge_audit(s.audit_retention_days)
+    db.purge_quotas()
     bloques = db.stale_jobs(minutes=15)
     for job in bloques:
-        db.update_job(job["id"], erreur="traitement interrompu (délai de la fonction dépassé)",
-                      erreur_publique="Votre diagnostic n'a pas pu être produit automatiquement. Un conseiller DC-KNOWING vous rappelle très vite.")
-        db.log_event(job["id"], "ERREUR", job["progression"], {"etape": "ERREUR", "progression": job["progression"],
-                     "message": "Traitement interrompu · un conseiller vous rappelle", "niveau": "erreur", "t": now_iso()})
-    return {"fichiers_bruts": len(docs), "rapports": n_rapports, "traitements_interrompus": len(bloques)}
+        mark_interrupted(db, job)
+    out = {"fichiers_bruts": n_docs, "rapports": n_rapports, "traitements_interrompus": len(bloques)}
+    log.info("purge : %s", out)
+    return out
 
 
 def create_app(settings: Settings | None = None, llm: LLMClient | None = None, sb: Supabase | None = None) -> FastAPI:
     s = settings or get_settings()
+    if s.production and (pb := s.problemes_config()):
+        # refuser de démarrer plutôt que de tourner à moitié (rendus Word en 401, purge désactivée, jetons incohérents)
+        raise RuntimeError("Configuration de production incomplète : " + " ; ".join(pb))
+    if s.production and (pb := s.blocages_ia()):
+        log.error("IA désactivée en production tant que : %s", " ; ".join(pb))
+    for user, acc in s.admin_accounts.items():
+        if not is_hashed(acc["secret"]):
+            refus = " — refusé en production" if s.production and not s.mots_de_passe_clair else ""
+            log.warning("compte conseiller %s : mot de passe en clair%s", user, refus)
     s.ensure_dirs()
+    if s.sentry_dsn:
+        try:
+            import sentry_sdk
+            sentry_sdk.init(dsn=s.sentry_dsn, environment=s.vercel_env or "local", send_default_pii=False, traces_sample_rate=0.0)
+        except ImportError:
+            log.warning("SENTRY_DSN défini mais sentry-sdk absent")
     if sb is None:
         if not (s.supabase_url and s.supabase_service_key):
             log.error("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY manquantes : l'API ne peut pas fonctionner")
-        sb = Supabase(s.supabase_url or "http://supabase.invalid", s.supabase_service_key, s.supabase_anon_key)
+        sb = Supabase(s.supabase_url or "http://supabase.invalid", s.supabase_service_key, s.supabase_anon_key,
+                      internal_secret=s.internal_secret)
     db = Database(sb)
     pipeline = Pipeline(s, db, sb, llm or OpenRouterClient(s))
-    login_limiter = RateLimiter(10, 900)
+    login_limiter = RateLimiter(10, 900)  # repli si la base ne répond pas
 
-    app = FastAPI(title="DC-KNOWING — Check-up 360 (JPO)", version="3.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
+    docs = (None, None) if s.production else ("/api/docs", "/api/openapi.json")
+    app = FastAPI(title="DC-KNOWING — Check-up 360 (JPO)", version="3.1", docs_url=docs[0], openapi_url=docs[1], redoc_url=None)
     app.add_middleware(CORSMiddleware, allow_origins=s.cors_origins, allow_methods=["GET", "POST", "DELETE"], allow_headers=["*"])
     app.state.db, app.state.pipeline, app.state.settings, app.state.sb = db, pipeline, s, sb
+
+    @app.middleware("http")
+    async def _no_store(request: Request, call_next):
+        """Réponses personnelles : jamais en cache (navigateur, proxy, CDN)."""
+        response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.exception_handler(SupabaseError)
     async def _supabase_error(_: Request, exc: SupabaseError):
@@ -94,12 +154,38 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
             raise HTTPException(401, "Session expirée : reconnectez-vous avec un nouveau code.")
         return {"id": user["id"], "email": user["email"].lower(), "token": token}
 
+    def account(user: str) -> dict | None:
+        acc = s.admin_accounts.get(user)
+        if not acc or (s.production and not s.mots_de_passe_clair and not is_hashed(acc["secret"])):
+            return None
+        return acc
+
+    def fingerprint(acc: dict) -> str:
+        return account_fingerprint(s.secret_key, acc["secret"] + "|" + acc["totp"], s.admin_token_version)
+
     def admin_email(request: Request) -> str:
-        user = verify_token(s.secret_key, bearer(request), "admin")
+        """Conseiller connecté. Jeton lié à l'empreinte du compte : changer le mot de passe, la clé TOTP ou
+        ADMIN_TOKEN_VERSION révoque les jetons déjà émis ; retirer le compte aussi."""
         if not s.admin_accounts:
             raise HTTPException(503, "Espace conseiller désactivé (aucun compte configuré)")
-        if not user or user not in s.admin_accounts:
+        jeton = bearer(request)
+        if not jeton and request.headers.get("authorization") is None:
+            # navigateur : jeton dans un cookie HttpOnly (illisible par un script). Anti-CSRF : cookie SameSite=Strict
+            # ET en-tête X-Checkup exigé pour toute action (un site tiers ne peut pas l'ajouter sans pré-vérification CORS)
+            jeton = request.cookies.get(ADMIN_COOKIE, "")
+            if jeton and request.method != "GET" and request.headers.get("x-checkup") != "1":
+                raise HTTPException(403, "Requête refusée (en-tête de sécurité absent)")
+        sujet = verify_token(s.secret_key, jeton, "admin") or ""
+        user, _, fp = sujet.rpartition(":")
+        acc = account(user)
+        if not acc or not hmac.compare_digest(fp, fingerprint(acc)):
             raise HTTPException(401, "Authentification requise", headers={"WWW-Authenticate": "Bearer"})
+        return user
+
+    def admin_ecriture(user: str = Depends(admin_email)) -> str:
+        """Actions (export, envoi, relance, suivi) : rôle « conseiller » ; le rôle « lecture » consulte seulement."""
+        if s.admin_accounts[user]["role"] != "conseiller":
+            raise HTTPException(403, "Action réservée aux conseillers (votre compte est en lecture seule)")
         return user
 
     def own_job(job_id: str, user: dict) -> dict:
@@ -137,8 +223,22 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
 
     # ------------------------------------------------------------------ public
     @app.get("/api/health")
-    def health():
-        return {"ok": True}
+    def health(profond: int = 0):
+        """Supervision : configuration (secrets, IA, rendu Word) et, avec ?profond=1, accès à la base."""
+        checks = {"configuration": not s.problemes_config(), "ia_conforme": not s.problemes_ia(),
+                  "rendu_word": bool(s.docx_render_url or s.node_path), "comptes_conseillers_haches":
+                  all(is_hashed(a["secret"]) for a in s.admin_accounts.values()) if s.admin_accounts else None}
+        if profond:
+            try:
+                sb.select("compteurs", {"select": "annee", "limit": "1"})
+                checks["base"] = True
+            except Exception:  # noqa: BLE001
+                checks["base"] = False
+        ok = checks["configuration"] and checks.get("base", True) is not False and (not s.blocages_ia() or not s.production)
+        detail = {"ok": ok, "checks": checks}
+        if not s.production:  # en production, le détail des réglages manquants reste dans les journaux
+            detail["problemes"] = s.problemes_config() + s.problemes_ia()
+        return JSONResponse(status_code=200 if ok else 503, content=detail)
 
     @app.get("/api/meta")
     def meta():
@@ -148,11 +248,44 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
                                "word": bool(s.docx_render_url or s.node_path)}}
 
     # ------------------------------------------------------------------ dépôt et traitement
+    @app.post("/api/fichiers")
+    def autoriser_fichiers(payload: dict, user: dict = Depends(visitor)):
+        """Étape 1 du dépôt : le serveur vérifie formats, tailles et quotas AVANT tout envoi, crée les lignes documents
+        et remet un jeton d'envoi signé par fichier. Les visiteurs n'ont aucun autre droit de dépôt dans Storage."""
+        fichiers = payload.get("fichiers") or []
+        if not isinstance(fichiers, list) or not 1 <= len(fichiers) <= s.max_files:
+            raise HTTPException(422, f"Déposez entre 1 et {s.max_files} fichiers.")
+        rows, total = [], 0
+        for f in fichiers:
+            nom = str((f or {}).get("nom", "")).strip()[:200]
+            ext = "." + nom.rsplit(".", 1)[-1].lower() if "." in nom else ""
+            try:
+                taille = int((f or {}).get("taille", 0))
+            except (TypeError, ValueError):
+                taille = 0
+            if ext not in ALLOWED_EXT:
+                raise HTTPException(422, f"Format non accepté pour « {nom or '?'} » (CSV, XLSX ou PDF).")
+            if not 0 < taille <= s.max_upload_bytes:
+                raise HTTPException(413, f"« {nom} » : {s.max_upload_bytes // (1024 * 1024)} Mo maximum par fichier.")
+            total += taille
+            cat = str((f or {}).get("categorie", "autre"))
+            rows.append({"user_id": user["id"], "nom_fichier": nom, "chemin": f"{user['id']}/{uuid.uuid4()}{ext}", "taille": taille,
+                         "type": MIME[ext], "categorie": cat if cat in TYPES_FICHIERS else "autre"})
+        if total > s.max_total_bytes:
+            raise HTTPException(413, f"{s.max_total_bytes // (1024 * 1024)} Mo maximum pour l'ensemble des fichiers.")
+        if not db.consume(f"fichiers:{user['id']}", len(rows), s.max_files_hour, 3600):
+            raise HTTPException(429, "Trop de fichiers envoyés en une heure : réessayez plus tard.")
+        if not db.consume(f"octets:{user['id']}", total, s.max_user_bytes_day, 86400):
+            raise HTTPException(429, "Volume d'envoi quotidien atteint : réessayez demain ou contactez un conseiller.")
+        out = []
+        for row in db.create_documents(rows):
+            out.append({"id": row["id"], "chemin": row["chemin"], "jeton": sb.signed_upload("documents", row["chemin"]),
+                        "type": row["type"]})
+        return {"fichiers": out}
+
     @app.post("/api/diagnostics", status_code=202)
     def depot(payload: dict, request: Request, user: dict = Depends(visitor)):
-        """Crée le diagnostic à partir des réponses du formulaire et des documents déjà déposés dans Storage."""
-        if db.count_recent(user["id"]) >= s.rate_limit:
-            raise HTTPException(429, "Trop de dépôts : réessayez dans une heure.")
+        """Étape 2 : crée le diagnostic à partir des réponses du formulaire et des documents déposés (étape 1)."""
         f = payload
         try:  # l'e-mail du dépôt est toujours celui de la session, jamais celui du formulaire
             form = DepotForm(raison_sociale=f.get("raison_sociale"), ncc=f.get("ncc") or None, secteur=f.get("secteur"),
@@ -177,13 +310,14 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
             ext = "." + d["nom_fichier"].rsplit(".", 1)[-1].lower() if "." in d["nom_fichier"] else ""
             if ext not in ALLOWED_EXT:
                 raise HTTPException(422, f"Format non accepté pour « {d['nom_fichier']} » (CSV, XLSX ou PDF).")
-        job = db.create_job(user["id"], user["email"], form.model_dump(mode="json"), form.jour_evenement, form.secteur, form.raison_sociale)
-        db.attach_documents(job["id"], ids)
-        categories = {str(d.get("id")): d.get("type") for d in demandes if isinstance(d, dict)}
-        for d in docs:  # catégorie choisie par le visiteur (balance, compte de résultat, bilan)
-            cat = categories.get(d["id"])
-            if cat in TYPES_FICHIERS and cat != d["categorie"]:
-                sb.update("documents", {"id": f"eq.{d['id']}"}, {"categorie": cat})
+        categories = {str(d.get("id")): d.get("type") for d in demandes if isinstance(d, dict) and d.get("type") in TYPES_FICHIERS}
+        try:  # quota horaire + rattachement des documents : une seule transaction en base
+            job = db.create_job(user["id"], user["email"], form.model_dump(mode="json"), form.jour_evenement, form.secteur,
+                                form.raison_sociale, ids, categories, s.rate_limit)
+        except QuotaDepasse:
+            raise HTTPException(429, "Trop de dépôts : réessayez dans une heure.") from None
+        except DocumentsIndisponibles:
+            raise HTTPException(422, "Documents introuvables ou déjà utilisés : redéposez vos fichiers.") from None
         db.update_profile(user["id"], nom=form.contact_nom, entreprise=form.raison_sociale, telephone=form.contact_telephone)
         db.audit(job["id"], "visiteur", "depot", client_ip(request))
         return {"job_id": job["id"], "reference": job["ref"]}
@@ -195,17 +329,29 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
         job = own_job(job_id, user)
         if job["statut"] in TERMINAUX:
             return {"etat": "termine"}
+        if job["tentatives"] >= s.max_tentatives and db.is_stale(job):
+            mark_interrupted(db, job)
+            return {"etat": "termine"}
         if not db.claim(job_id):
             return JSONResponse(status_code=202, content={"etat": "en_cours"})
+        if job["tentatives"] >= 1:  # verrou repris après une coupure : reprise là où le traitement s'était arrêté
+            pipeline.note_reprise(job_id, job["tentatives"] + 1)
         pipeline.process(job_id, user["token"])
         return {"etat": "termine"}
 
     @app.get("/api/diagnostics/{job_id}/journal")
     def journal(job_id: str, depuis: int = 0, user: dict = Depends(visitor)):
         job = own_job(job_id, user)
+        reprendre = False
+        if db.is_stale(job):  # fonction coupée en cours de route : reprise automatique, puis erreur si elle échoue encore
+            if job["tentatives"] < s.max_tentatives:
+                reprendre = True  # le navigateur relance POST /traiter, qui reprend depuis la dernière étape enregistrée
+            else:
+                mark_interrupted(db, job)
+                job = own_job(job_id, user)
         events = job["journal"]
         return {"evenements": events[max(depuis, 0):], "suivant": len(events), "termine": job["statut"] in TERMINAUX,
-                "statut": FRONT_ETAPE[job["statut"]]}
+                "statut": FRONT_ETAPE[job["statut"]], "reprendre": reprendre}
 
     @app.get("/api/diagnostics/{job_id}")
     def diagnostic(job_id: str, user: dict = Depends(visitor)):
@@ -276,7 +422,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
                                           "entretien": entretien, "ics_base64": base64.b64encode(data).decode()}, user["token"])
         except Exception:  # noqa: BLE001
             log.exception("envoi de l'invitation en échec")
-            raise HTTPException(502, "Impossible d'envoyer l'e-mail pour le moment.")
+            raise HTTPException(502, "Impossible d'envoyer l'e-mail pour le moment.") from None
         return {"ok": True}
 
     @app.delete("/api/me")
@@ -285,8 +431,10 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
         sb.remove("documents", [d["chemin"] for d in db.owner_documents(user["id"])])
         for job in db.delete_owner(user["id"]):
             sb.remove("rapports", [p for p in (job["docx_path"], job["md_path"]) if p])
-        db.audit(None, user["id"][:8], "effacement_donnees", client_ip(request))
+        db.audit(None, "visiteur", "effacement_donnees")  # ni identifiant ni IP : le compte n'existe plus
         sb.delete_user(user["id"])  # supprime aussi le profil et les documents restants (cascade)
+        if hasattr(sb, "forget_user"):
+            sb.forget_user(user["token"])
         return {"ok": True}
 
     # ------------------------------------------------------------------ tâche planifiée (Vercel Cron)
@@ -296,22 +444,74 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
             raise HTTPException(401, "Non autorisé")
         return purge(db, sb, s)
 
+    @app.api_route("/api/worker", methods=["GET", "POST"])
+    def worker(request: Request):
+        """Reprise automatique sans navigateur (visiteur parti) : appelé chaque minute par pg_cron + pg_net (voir
+        DEPLOIEMENT.md §9.1), protégé par CRON_SECRET. Traite au plus un dossier par appel (une fonction = un traitement)."""
+        if not s.cron_secret or not hmac.compare_digest(bearer(request), s.cron_secret):
+            raise HTTPException(401, "Non autorisé")
+        interrompus = 0
+        for job in db.pending_jobs():
+            if not db.is_stale(job, attente_minutes=2):
+                continue
+            if job["tentatives"] >= s.max_tentatives:
+                mark_interrupted(db, job)
+                interrompus += 1
+                continue
+            if db.claim(job["id"]):
+                if job["tentatives"] >= 1:
+                    pipeline.note_reprise(job["id"], job["tentatives"] + 1)
+                pipeline.process(job["id"])
+                return {"traite": job["id"], "interrompus": interrompus}
+        return {"traite": None, "interrompus": interrompus}
+
     # ------------------------------------------------------------------ conseillers
+    def tentative(cle: str, maximum: int, fenetre: int) -> bool:
+        """Limitation partagée entre toutes les instances (base) ; repli en mémoire si la base ne répond pas."""
+        try:
+            return db.consume(cle, 1, maximum, fenetre)
+        except Exception:  # noqa: BLE001
+            log.exception("limiteur en base indisponible : repli en mémoire")
+            return login_limiter.allow(cle)
+
     @app.post("/api/admin/login")
     def login(request: Request, payload: dict):
         ip = client_ip(request)
-        if not login_limiter.allow(ip):
-            raise HTTPException(429, "Trop de tentatives")
         if not s.admin_accounts:
             raise HTTPException(503, "Espace conseiller désactivé (aucun compte configuré)")
-        user = str(payload.get("email") or payload.get("username") or "").strip().lower()
-        expected = s.admin_accounts.get(user, "")
-        ok = hmac.compare_digest(str(payload.get("password", "")).encode(), (expected or secrets.token_hex(16)).encode()) and bool(expected)
+        user = str(payload.get("email") or payload.get("username") or "").strip().lower()[:120]
+        # 10 essais / 15 min par adresse IP ; 5 échecs / 15 min par compte (verrouillage temporaire)
+        if not tentative(f"login-ip:{ip}", 10, 900) or not tentative(f"login-compte:{user}", 5, 900):
+            db.audit(None, user or "?", "login_bloque", ip)
+            raise HTTPException(429, "Trop de tentatives : réessayez dans 15 minutes.")
+        password = str(payload.get("password", ""))
+        acc = account(user)
+        if acc:
+            ok = verify_password(password, acc["secret"], allow_plain=s.mots_de_passe_clair or not s.production)
+        else:
+            dummy_password_check(password)
+            ok = False
+        if ok and acc["totp"]:
+            code = str(payload.get("code") or "")
+            if not code:
+                raise HTTPException(401, "Code de l'application d'authentification requis", headers={"X-Totp-Requis": "1"})
+            ok = verify_totp(acc["totp"], code)
         if not ok:
-            db.audit(None, user[:60] or "?", "login_echec", ip)
+            db.audit(None, user or "?", "login_echec", ip)
             raise HTTPException(401, "Identifiants invalides")
         db.audit(None, user, "login", ip)
-        return {"token": sign_token(s.secret_key, "admin", user, s.admin_token_ttl), "expire_dans_s": s.admin_token_ttl}
+        token = sign_token(s.secret_key, "admin", f"{user}:{fingerprint(acc)}", s.admin_token_ttl)
+        # le jeton n'est remis que dans un cookie HttpOnly : aucun script de la page ne peut le lire ni l'exfiltrer
+        resp = JSONResponse({"ok": True, "expire_dans_s": s.admin_token_ttl, "role": acc["role"]})
+        resp.set_cookie(ADMIN_COOKIE, token, max_age=s.admin_token_ttl, path="/api/admin", httponly=True, secure=s.on_vercel,
+                        samesite="strict")
+        return resp
+
+    @app.post("/api/admin/logout")
+    def logout():
+        resp = JSONResponse({"ok": True})
+        resp.delete_cookie(ADMIN_COOKIE, path="/api/admin", httponly=True, secure=s.on_vercel, samesite="strict")
+        return resp
 
     def admin_view(job: dict, booking: dict | None, detail: bool = False) -> dict:
         form = job["form"]
@@ -339,7 +539,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
         return [admin_view(j, bookings.get(j["id"])) for j in jobs]
 
     @app.get("/api/admin/diagnostics.csv")
-    def admin_csv(request: Request, jour: str | None = None, user: str = Depends(admin_email)):
+    def admin_csv(request: Request, jour: str | None = None, user: str = Depends(admin_ecriture)):
         db.audit(None, user, "export_csv", client_ip(request))
         cols = ["reference", "entreprise", "contact", "email", "telephone", "type_client", "secteur", "effectif", "statut", "performance",
                 "conformite", "couverture_pct", "entretien", "entretien_realise", "rappel_demande", "rappel_effectue", "cree_le"]
@@ -372,7 +572,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
         return {"url": signed_report(job), "format": "docx"}
 
     @app.get("/api/admin/diagnostics/{job_id}/md")
-    def admin_md(job_id: str, request: Request, user: str = Depends(admin_email)):
+    def admin_md(job_id: str, request: Request, user: str = Depends(admin_ecriture)):
         job = any_job(job_id)
         if not job["md_path"]:
             raise HTTPException(404, "Fichier non disponible")
@@ -381,7 +581,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
                         headers={"Content-Disposition": f'attachment; filename="Diagnostic_DC-KNOWING_{job["ref"]}.md"'})
 
     @app.post("/api/admin/diagnostics/{job_id}/renvoyer")
-    def admin_renvoyer(job_id: str, request: Request, user: str = Depends(admin_email)):
+    def admin_renvoyer(job_id: str, request: Request, user: str = Depends(admin_ecriture)):
         any_job(job_id)
         try:
             pipeline.resend(job_id)
@@ -389,12 +589,12 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
             raise HTTPException(409, str(e)) from e
         except Exception:  # noqa: BLE001
             log.exception("renvoi de l'e-mail en échec")
-            raise HTTPException(502, "Impossible d'envoyer l'e-mail pour le moment.")
+            raise HTTPException(502, "Impossible d'envoyer l'e-mail pour le moment.") from None
         db.audit(job_id, user, "renvoi_email", client_ip(request))
         return {"ok": True}
 
     @app.post("/api/admin/diagnostics/{job_id}/relancer")
-    def admin_relancer(job_id: str, request: Request, user: str = Depends(admin_email)):
+    def admin_relancer(job_id: str, request: Request, user: str = Depends(admin_ecriture)):
         """Relance un dépôt en erreur ; le traitement s'exécute dans cette requête (jusqu'à ~5 min)."""
         job = any_job(job_id)
         if job["statut"] != "ERREUR":
@@ -415,11 +615,11 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
         return {"ok": True}
 
     @app.post("/api/admin/diagnostics/{job_id}/entretien-realise")
-    def admin_entretien_realise(job_id: str, request: Request, user: str = Depends(admin_email)):
+    def admin_entretien_realise(job_id: str, request: Request, user: str = Depends(admin_ecriture)):
         return _flag(job_id, user, request, entretien_realise=True)
 
     @app.post("/api/admin/diagnostics/{job_id}/rappel-effectue")
-    def admin_rappel_effectue(job_id: str, request: Request, user: str = Depends(admin_email)):
+    def admin_rappel_effectue(job_id: str, request: Request, user: str = Depends(admin_ecriture)):
         return _flag(job_id, user, request, rappel_effectue=True)
 
     # ------------------------------------------------------------------ front statique en local (sur Vercel : servi par le CDN)

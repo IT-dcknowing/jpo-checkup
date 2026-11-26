@@ -70,7 +70,8 @@ Règles affichées à l'écran : code à 6 chiffres, valable 10 minutes, 3 essai
 
 | Méthode | Route | Détail |
 |---|---|---|
-| POST | `/api/diagnostics` | multipart : champs ci-dessous + `fichiers` (1 à 10) + `types_fichiers` (`balance`, `cr`, `bilan`, `autre`, même ordre). Réponse `{ "job_id", "reference" }`. Erreurs gérées : 401, 413, 422, 429 |
+| POST | `/api/fichiers` | `{ "fichiers": [{ "nom", "taille", "categorie" }] }` (1 à 10, CSV/XLSX/PDF, 20 Mo par fichier, 50 Mo au total). Quotas vérifiés AVANT l'envoi. Réponse `{ "fichiers": [{ "id", "chemin", "jeton", "type" }] }` ; chaque fichier part ensuite dans Supabase Storage par `storage.from('documents').uploadToSignedUrl(chemin, jeton, fichier)` (seule voie de dépôt). Erreurs : 401, 413, 422, 429 |
+| POST | `/api/diagnostics` | JSON : champs ci-dessous + `documents: [{ "id", "type" }]` (identifiants reçus de `/api/fichiers`). Réponse `{ "job_id", "reference" }`. Erreurs gérées : 401, 422, 429 |
 | GET | `/api/diagnostics/{id}/sse` | flux d'avancement (voir plus bas) |
 | GET | `/api/diagnostics/{id}` | résumé du diagnostic (champs ci-dessous) |
 | GET | `/api/diagnostics/{id}/pdf` | `{ "url" }` — lien signé valable 7 jours |
@@ -105,7 +106,7 @@ Le front ferme le flux sur `ENVOYE` ou `ERREUR`, puis appelle `GET /api/diagnost
 
 | Méthode | Route | Détail |
 |---|---|---|
-| POST | `/api/admin/login` | `{ "email", "password" }` → `{ "token" }` |
+| POST | `/api/admin/login` | `{ "email", "password", "code"? }` → `{ "token", "role" }` (code TOTP si activé pour le compte ; jeton conservé en sessionStorage, 4 h) |
 | GET | `/api/admin/diagnostics?jour=2026-12-16` | liste du jour, rechargée toutes les 10 s |
 | GET | `/api/admin/diagnostics/{id}/pdf` | `{ "url" }` |
 | POST | `/api/admin/diagnostics/{id}/renvoyer` | renvoi de l'e-mail |
