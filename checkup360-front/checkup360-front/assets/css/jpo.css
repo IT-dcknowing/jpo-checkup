@@ -143,6 +143,15 @@ a{color:#000000}a:hover{color:#262626}
 .prog .l::before{content:"";position:absolute;top:0;bottom:0;width:2px;background:#E0E0E0}
 .prog .l i{position:relative;width:12px;height:12px;border-radius:50%;background:#FFFFFF;border:2px solid #000000;margin-top:5px}
 .prog .l i.hl2{background:#FFD700}
+.prog .l i.hl3{background:#000000}
+.prog .l i.hl4{background:#15803D;border-color:#15803D}
+.jchk{display:flex;gap:12px;align-items:flex-start;min-height:44px;padding:12px 14px;border:1.5px solid #E0E0E0;border-radius:14px;background:#FFFFFF;cursor:pointer}
+.jchk:hover{border-color:#000000}
+.jchk.on{background:#FEF9E7;border-color:#000000}
+.jchk input{width:20px;height:20px;accent-color:#000000;flex:none;margin-top:1px}
+.jchk b{display:block;font-size:14px}
+.jchk .hint{display:block}
+.creneaux{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
 .prog .c{padding-bottom:16px}
 .daytab{min-height:40px;padding:0 14px;border-radius:12px;border:1.5px solid #E0E0E0;background:#FFFFFF;font:600 13px "Plus Jakarta Sans",sans-serif;cursor:pointer;color:#000000;transition:all .2s}
 .daytab:hover{border-color:#000000}

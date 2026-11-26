@@ -25,6 +25,10 @@ Migrations appliquées sur le projet `hhzwzoantzhgtsbrtswr` :
 sauvegarde (§6). Cette migration retire aux visiteurs le dépôt direct dans Storage : l'ancien front ne peut plus déposer,
 déployer le nouveau front en même temps.
 
+**Plusieurs jours de visite :** `20261126190000_plusieurs_jours.sql`, compatible avec l'API précédente (à appliquer avant
+le déploiement), puis redéployer l'Edge Function (rappels et invitation). Rappels : tâche Vercel `/api/cron/rappels`
+(17 h, la veille de chaque jour). Capacité par créneau = nombre d'experts : `ENTRETIEN_CAPACITE` (défaut 3).
+
 Tests des migrations et de l'isolation (Postgres local ou CI) : `supabase/tests/run.sh`.
 
 ## 2. Supabase Auth — réglages du tableau de bord

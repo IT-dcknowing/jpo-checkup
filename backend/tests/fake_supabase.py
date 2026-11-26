@@ -25,6 +25,8 @@ def _match(row: dict, key: str, cond: str) -> bool:
         ok = str(val) in arg.strip("()").split(",")
     elif op == "gte":
         ok = val is not None and str(val) >= arg
+    elif op == "cs":
+        ok = all(x in (val or []) for x in arg.strip("{}").split(","))
     elif op == "lt":
         ok = val is not None and str(val) < arg
     else:
@@ -82,6 +84,8 @@ class FakeSupabase:
                      "chemin_fichier": None, "chemin_markdown": None, "pages": None, "lecture_partielle": False, "modele_ia": None,
                      "erreur": None, "erreur_publique": None, "rappel_demande": False, "rappel_effectue": False, "entretien_realise": False,
                      "traitement_depuis": None, "tentatives": 0, "termine_le": None, "envoye_le": None, **r}
+            if table == "rapports" and not r.get("jours_visite"):  # trigger remplir_jours_visite
+                r["jours_visite"] = sorted(set(r.get("formulaire", {}).get("jours_visite") or [])) or [r["jour_evenement"]]
             if table == "documents":
                 r.setdefault("rapport_id", None)
                 r.setdefault("categorie", "autre")
@@ -165,10 +169,13 @@ class FakeSupabase:
             return True
         if fn == "reserver_entretien":
             n = sum(1 for e in self.tables["entretiens"] if e["jour"] == args["p_jour"] and e["heure"] == args["p_heure"]
-                    and e["rapport_id"] != args["p_rapport"])
+                    and e["user_id"] != args["p_user"])
             if n >= args["p_capacite"]:
                 return False
-            self.tables["entretiens"] = [e for e in self.tables["entretiens"] if e["rapport_id"] != args["p_rapport"]]
+            self.tables["entretiens"] = [e for e in self.tables["entretiens"] if e["user_id"] != args["p_user"]]
+            for r in self.tables["rapports"]:
+                if r["id"] == args["p_rapport"]:
+                    r["jours_visite"] = sorted({*r["jours_visite"], args["p_jour"]})
             self.tables["entretiens"].append({"rapport_id": args["p_rapport"], "user_id": args["p_user"], "jour": args["p_jour"],
                                               "heure": args["p_heure"], "created_at": _now()})
             return True

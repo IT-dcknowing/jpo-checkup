@@ -13,7 +13,7 @@ import io
 import logging
 import re
 import uuid
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +21,7 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from . import ics
+from . import evenement, ics
 from .config import Settings, get_settings
 from .db import TERMINAUX, Database, DocumentsIndisponibles, QuotaDepasse, now_iso
 from .llm import LLMClient, OpenRouterClient
@@ -47,7 +47,6 @@ MSG_INTERROMPU = "Votre diagnostic n'a pas pu être produit automatiquement. Un 
 log = logging.getLogger("jpo.api")
 UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 HEURE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
-JOURS_LONGS = {"2026-12-16": "Mercredi 16 décembre 2026", "2026-12-17": "Jeudi 17 décembre 2026", "2026-12-18": "Vendredi 18 décembre 2026"}
 
 
 def mark_interrupted(db: Database, job: dict) -> None:
@@ -88,6 +87,35 @@ def purge(db: Database, sb: Supabase, s: Settings, max_lots: int = 200) -> dict:
         mark_interrupted(db, job)
     out = {"fichiers_bruts": n_docs, "rapports": n_rapports, "traitements_interrompus": len(bloques)}
     log.info("purge : %s", out)
+    return out
+
+
+def envoyer_rappels(s: Settings, db: Database, sb: Supabase, maintenant: datetime | None = None) -> dict:
+    demain = ((maintenant or datetime.now(UTC)) + timedelta(days=1)).date().isoformat()
+    if demain not in s.event_days or not s.emails_actifs:
+        return {"jour": demain, "envoyes": 0, "echecs": 0}
+    par_visiteur: dict[str, list[dict]] = {}
+    for job in db.list_jobs(jour=demain, limit=1000):  # du plus récent au plus ancien
+        par_visiteur.setdefault(job["owner"], []).append(job)
+    envoyes = echecs = 0
+    for owner, jobs in par_visiteur.items():
+        if any(demain in (j["donnees"].get("rappels") or []) for j in jobs):
+            continue  # déjà prévenu : la tâche peut être relancée sans doublon
+        job = jobs[0]
+        booking = db.latest_booking(owner)
+        try:
+            sb.invoke("envoyer-rapport", {
+                "type": "rappel", "rapport_id": job["id"], "jour_long": evenement.jour_long(demain),
+                "accroche": evenement.ACCROCHES.get(demain, ""), "programme": evenement.PROGRAMMES.get(demain, []),
+                "entretien": evenement.heure_fr(booking["heure"]) if booking and booking["jour"] == demain else None})
+        except Exception:  # noqa: BLE001 — un échec ne bloque pas les autres rappels
+            log.exception("rappel en échec pour le dossier %s", job["id"])
+            echecs += 1
+            continue
+        db.update_job(job["id"], rappels=[*(job["donnees"].get("rappels") or []), demain])
+        envoyes += 1
+    out = {"jour": demain, "envoyes": envoyes, "echecs": echecs}
+    log.info("rappels : %s", out)
     return out
 
 
@@ -210,6 +238,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
         resume = job["resume"] or {}
         out = {"job_id": job["id"], "reference": job["ref"], "entreprise": job["form"]["raison_sociale"], "statut": FRONT_ETAPE[job["statut"]],
                "progression": job["progression"], "created_at": job["created_at"], "entretien": booking["heure"] if booking else None,
+               "entretien_jour": booking["jour"] if booking else None, "jours_visite": job["jours_visite"],
                "email_envoye": bool(job["email_envoye_at"]), "rapport_disponible": bool(job["docx_path"])}
         if done:
             out |= {"score_performance": job["score_performance"], "grade_performance": job["grade_performance"],
@@ -287,18 +316,26 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
     def depot(payload: dict, request: Request, user: dict = Depends(visitor)):
         """Étape 2 : crée le diagnostic à partir des réponses du formulaire et des documents déposés (étape 1)."""
         f = payload
+        jours = f.get("jours_visite") or [f.get("jour_evenement")]
+        if not isinstance(jours, list) or not jours or not all(isinstance(j, str) and j in s.event_days for j in jours):
+            raise HTTPException(422, "Choisissez au moins un jour de visite parmi les jours de l'événement.")
+        jours = sorted(set(jours))
+        creneau = f.get("creneau_entretien") or None
+        if creneau is not None:
+            jour_c, heure_c = (str(creneau.get("jour", "")), str(creneau.get("heure", ""))) if isinstance(creneau, dict) else ("", "")
+            if jour_c not in jours or heure_c not in s.slots.get(jour_c, []):
+                raise HTTPException(422, "Créneau d'entretien invalide : choisissez-le parmi vos jours de visite.")
+            creneau = (jour_c, heure_c)
         try:  # l'e-mail du dépôt est toujours celui de la session, jamais celui du formulaire
             form = DepotForm(raison_sociale=f.get("raison_sociale"), ncc=f.get("ncc") or None, secteur=f.get("secteur"),
                              effectif=f.get("effectif"), contact_nom=f.get("contact_nom"), contact_email=user["email"],
                              contact_telephone=f.get("contact_telephone"), type_client=f.get("type_client"),
-                             jour_evenement=f.get("jour_evenement"), regime_fiscal=f.get("regime_fiscal"), fne=f.get("fne"),
+                             jour_evenement=jours[0], jours_visite=jours, regime_fiscal=f.get("regime_fiscal"), fne=f.get("fne"),
                              dgi=f.get("statut_dgi"), cnps=f.get("statut_cnps"), its=f.get("statut_its"), cmu=f.get("statut_cmu"),
                              disa=f.get("statut_disa"), tva_exoneree=str(f.get("tva_exoneree")).lower() == "true",
                              consentement=str(f.get("consentement_artci")).lower() == "true")
         except ValidationError as e:
             return JSONResponse(status_code=422, content={"detail": [{"champ": ".".join(map(str, x["loc"])), "msg": x["msg"]} for x in e.errors()]})
-        if form.jour_evenement not in s.event_days:
-            raise HTTPException(422, "Jour d'événement inconnu")
         demandes = payload.get("documents") or []
         ids = [str(d.get("id", "")) for d in demandes if isinstance(d, dict)]
         if not 1 <= len(ids) <= s.max_files or not all(UUID.match(i) for i in ids) or len(set(ids)) != len(ids):
@@ -320,7 +357,13 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
             raise HTTPException(422, "Documents introuvables ou déjà utilisés : redéposez vos fichiers.") from None
         db.update_profile(user["id"], nom=form.contact_nom, entreprise=form.raison_sociale, telephone=form.contact_telephone)
         db.audit(job["id"], "visiteur", "depot", client_ip(request))
-        return {"job_id": job["id"], "reference": job["ref"]}
+        out = {"job_id": job["id"], "reference": job["ref"]}
+        if creneau:  # le dépôt n'échoue pas si le créneau vient d'être pris : le visiteur en choisira un autre
+            pris = db.book_slot(job["id"], user["id"], creneau[0], creneau[1], s.slot_capacity)
+            out["entretien_refuse"] = not pris
+            if pris:
+                db.audit(job["id"], "visiteur", f"entretien_{creneau[0]}_{creneau[1]}")
+        return out
 
     @app.post("/api/diagnostics/{job_id}/traiter")
     def traiter(job_id: str, user: dict = Depends(visitor)):
@@ -390,7 +433,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
     def reserver(job_id: str, payload: dict, user: dict = Depends(visitor)):
         job = own_job(job_id, user)
         jour, heure = str(payload.get("jour", "")), str(payload.get("heure", ""))
-        if jour not in s.event_days or not HEURE.match(heure) or heure not in s.slots or heure < s.slot_min_by_day.get(jour, "00:00"):
+        if jour not in s.event_days or not HEURE.match(heure) or heure not in s.slots.get(jour, []):
             raise HTTPException(422, "Créneau invalide pour ce jour.")
         if job["statut"] not in ("ENVOYE", "TERMINE"):
             raise HTTPException(409, "L'entretien se réserve une fois le diagnostic terminé.")
@@ -402,12 +445,16 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
     def invitation_data(user: dict) -> tuple[bytes, str, str, str | None, str]:
         jobs = db.list_jobs(owner=user["id"], limit=1)
         booking = db.latest_booking(user["id"])
-        jour = (booking or {}).get("jour") or (jobs[0]["jour_evenement"] if jobs else s.event_days[0])
-        debut, fin = s.event_hours.get(jour, ("08:30", "17:30"))
-        entretien = booking["heure"] if booking and booking["jour"] == jour else None
-        data = ics.build_ics(user["id"].replace("-", "")[:12], jour, debut, fin, s.event_location, entretien, s.slot_minutes)
+        jours = jobs[0]["jours_visite"] if jobs else s.event_days[:1]
+        if booking and booking["jour"] not in jours:
+            jours = sorted([*jours, booking["jour"]])
+        journees = [(j, *s.event_hours.get(j, ("08:30", "17:30")), evenement.DESCRIPTIONS.get(j, "")) for j in jours]
+        entretien = (booking["jour"], booking["heure"]) if booking else None
+        data = ics.build_ics(user["id"].replace("-", "")[:12], journees, s.event_location, entretien, s.slot_minutes)
         nom = jobs[0]["form"]["contact_nom"] if jobs else ""
-        return data, JOURS_LONGS.get(jour, jour), f"à partir de {debut.replace(':', 'h')}", entretien, nom
+        horaire = "à partir de " + evenement.liste_fr([evenement.heure_fr(debut) for _, debut, _, _ in journees])
+        quand = f"{evenement.NOMS.get(entretien[0], entretien[0])} décembre à {evenement.heure_fr(entretien[1])}" if entretien else None
+        return data, evenement.jours_longs(jours), horaire, quand, nom
 
     @app.get("/api/me/invitation.ics")
     def invitation_ics(user: dict = Depends(visitor)):
@@ -443,6 +490,13 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
         if not s.cron_secret or not hmac.compare_digest(bearer(request), s.cron_secret):
             raise HTTPException(401, "Non autorisé")
         return purge(db, sb, s)
+
+    @app.get("/api/cron/rappels")
+    def cron_rappels(request: Request):
+        """La veille de chaque jour de visite (Vercel Cron, 17 h UTC = heure d'Abidjan) : un e-mail par visiteur."""
+        if not s.cron_secret or not hmac.compare_digest(bearer(request), s.cron_secret):
+            raise HTTPException(401, "Non autorisé")
+        return envoyer_rappels(s, db, sb)
 
     @app.api_route("/api/worker", methods=["GET", "POST"])
     def worker(request: Request):
@@ -520,7 +574,8 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
                "statut": FRONT_ETAPE[job["statut"]], "statut_envoi": job["statut_global"], "score_performance": job["score_performance"],
                "score_conformite": job["score_conformite"], "grade_performance": job["grade_performance"], "grade_conformite": job["grade_conformite"],
                "couverture_pct": job["couverture_pct"], "indicatif": bool((job["resume"] or {}).get("indicatif")),
-               "entretien": booking["heure"] if booking else None, "entretien_realise": bool(job["entretien_realise"]),
+               "entretien": booking["heure"] if booking else None, "entretien_jour": booking["jour"] if booking else None,
+               "jours_visite": job["jours_visite"], "entretien_realise": bool(job["entretien_realise"]),
                "rappel_demande": bool(job["rappel_demande"]), "rappel_effectue": bool(job["rappel_effectue"]), "alertes": job["alertes"],
                "plan_action": job["plan_action"], "erreur": job["erreur"], "pages": job["pages"],
                "lecture_partielle": bool(job["lecture_partielle"]), "modele_ia": job["modele_ia"], "email_envoye_at": job["email_envoye_at"],
@@ -542,7 +597,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
     def admin_csv(request: Request, jour: str | None = None, user: str = Depends(admin_ecriture)):
         db.audit(None, user, "export_csv", client_ip(request))
         cols = ["reference", "entreprise", "contact", "email", "telephone", "type_client", "secteur", "effectif", "statut", "performance",
-                "conformite", "couverture_pct", "entretien", "entretien_realise", "rappel_demande", "rappel_effectue", "cree_le"]
+                "conformite", "couverture_pct", "jours_visite", "entretien", "entretien_realise", "rappel_demande", "rappel_effectue", "cree_le"]
         buf = io.StringIO()
         w = csv.writer(buf, delimiter=";")
         w.writerow(cols)
@@ -553,7 +608,8 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
             a = admin_view(j, bookings.get(j["id"]))
             w.writerow([safe(x) for x in (a["reference"], a["nom_reel"], a["contact"]["nom"], a["contact"]["email"], a["contact"]["telephone"],
                                           a["type_client"], a["secteur"], a["effectif"], a["statut"], a["score_performance"], a["score_conformite"],
-                                          a["couverture_pct"], a["entretien"], int(a["entretien_realise"]), int(a["rappel_demande"]),
+                                          a["couverture_pct"], ", ".join(a["jours_visite"]),
+                                          f"{a['entretien_jour']} {a['entretien']}" if a["entretien"] else None, int(a["entretien_realise"]), int(a["rappel_demande"]),
                                           int(a["rappel_effectue"]), a["created_at"])])
         name = f"diagnostics_{jour or 'tous'}.csv"
         return Response("﻿" + buf.getvalue(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{name}"'})

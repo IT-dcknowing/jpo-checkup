@@ -271,9 +271,16 @@
 <div class="fld"><span class="lbl" id="l-type">Votre relation avec DC-KNOWING</span>
 <div role="group" aria-labelledby="l-type" style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{typeOpts}}" as="o" hint-placeholder-count="3"><button type="button" class="{{o.cls}}" aria-pressed="{{o.pressed}}" onClick="{{o.pick}}">{{o.l}}</button></sc-for></div>
 <sc-if value="{{err.typeClient}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.typeClient}}</span></sc-if></div>
-<div class="fld"><span class="lbl" id="l-jour">Jour de votre visite</span>
-<div role="group" aria-labelledby="l-jour" style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{jourOpts}}" as="o" hint-placeholder-count="3"><button type="button" class="{{o.cls}}" aria-pressed="{{o.pressed}}" onClick="{{o.pick}}">{{o.l}}</button></sc-for></div>
-<span class="hint">Siège DC-KNOWING, Cocody Riviera 2 · votre invitation sera à ce jour-là.</span></div>
+<div class="fld"><span class="lbl" id="l-jour">Quels jours viendrez-vous ?</span>
+<div role="group" aria-labelledby="l-jour" style="display: grid; gap: 8px"><sc-for list="{{jourOpts}}" as="o" hint-placeholder-count="3"><label class="{{o.cls}}"><input type="checkbox" checked="{{o.checked}}" onChange="{{o.toggle}}"><span><b>{{o.l}}</b><span class="hint">{{o.d}}</span></span></label></sc-for></div>
+<button type="button" class="btn btn-g btn-sm" data-son="clic" onClick="{{allDays}}" style="align-self: flex-start">Je viens les 3 jours</button>
+<sc-if value="{{err.jours}}" hint-placeholder-val="{{false}}"><span class="hint e">{{err.jours}}</span></sc-if>
+<span class="hint">Siège DC-KNOWING, Cocody Riviera 2 · votre invitation liste les jours cochés.</span></div>
+<div class="fld"><span class="lbl">Votre entretien individuel</span>
+<span class="hint">45 minutes avec un expert, accueil compris. Facultatif : vous pourrez aussi réserver depuis votre résultat. Touchez de nouveau un créneau pour l’annuler.</span>
+<sc-if value="{{noDays}}" hint-placeholder-val="{{false}}"><span class="hint">Cochez d’abord vos jours de visite.</span></sc-if>
+<sc-for list="{{formSlots}}" as="g" hint-placeholder-count="1"><div style="display: grid; gap: 8px; margin-top: 6px"><b style="font-size: 13px">{{g.l}}</b><div role="group" aria-label="{{g.l}}" class="creneaux"><sc-for list="{{g.slots}}" as="s" hint-placeholder-count="6"><button type="button" class="{{s.cls}} m" aria-pressed="{{s.pressed}}" onClick="{{s.pick}}" disabled="{{s.dis}}" aria-label="{{s.aria}}">{{s.t}}</button></sc-for></div></div></sc-for>
+<sc-if value="{{daysFull}}" hint-placeholder-val="{{false}}"><span class="hint e">Plus de place sur vos jours : cochez un autre jour.</span></sc-if></div>
 </div>
 </sc-if>
 
@@ -532,6 +539,7 @@
 <ol style="list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px">
 <sc-for list="{{res.actions}}" as="p" hint-placeholder-count="3"><li style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px; border: 1px solid #E0E0E0; border-radius: 14px"><span class="bdg {{p.cls}}">{{p.prio}}</span><b style="flex: 1; min-width: 200px; font-size: 14px">{{p.action}}</b><span class="hint">{{p.delai}}</span><span class="pill {{p.mod}}">{{p.module}}</span></li></sc-for>
 </ol>
+<p class="hint" style="margin-top: 12px">Outils concernés par votre plan d’action : démonstration en direct le vendredi 18 décembre à 09h55.</p>
 </section>
 
 <section style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
@@ -596,11 +604,12 @@
 
 <section class="card up d2" style="padding: 24px; display: flex; flex-direction: column; gap: 16px" aria-label="Programme">
 <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap">
-<div><h2 style="font-size: 20px">Programme de l’événement</h2><p class="hint">Siège DC-KNOWING, Cocody Riviera 2 · programme indicatif, horaires à confirmer</p></div>
+<div><h2 style="font-size: 20px">Programme de l’événement</h2><p class="hint">Siège DC-KNOWING, Cocody Riviera 2 · programme indicatif</p></div>
 <div role="group" aria-label="Choisir le jour" style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{progDays}}" as="d" hint-placeholder-count="3"><button type="button" class="{{d.cls}}" aria-pressed="{{d.pressed}}" onClick="{{d.pick}}">{{d.l}}</button></sc-for></div>
 </div>
+<sc-if value="{{venir}}" hint-placeholder-val="{{false}}"><span class="bdg b-ok" style="align-self: flex-start">Vous venez ce jour-là</span></sc-if>
 <ol style="list-style: none; margin: 4px 0 0; padding: 0">
-<sc-for list="{{progItems}}" as="p" hint-placeholder-count="5"><li class="prog"><span class="t">{{p.t}}</span><span class="l"><i class="{{p.dot}}"></i></span><div class="c"><b style="font-size: 14px">{{p.title}}</b><sc-if value="{{p.hasD}}" hint-placeholder-val="{{true}}"><p class="hint">{{p.d}}</p></sc-if><sc-if value="{{p.mine}}" hint-placeholder-val="{{false}}"><span class="bdg b-acc" style="margin-top: 4px">Votre diagnostic et votre entretien</span></sc-if></div></li></sc-for>
+<sc-for list="{{progItems}}" as="p" hint-placeholder-count="5"><li class="prog"><span class="t">{{p.t}}</span><span class="l"><i class="{{p.dot}}"></i></span><div class="c"><b style="font-size: 14px">{{p.title}}</b><sc-if value="{{p.hasD}}" hint-placeholder-val="{{true}}"><p class="hint">{{p.d}}</p></sc-if><sc-if value="{{p.hasQui}}" hint-placeholder-val="{{false}}"><p class="hint">Intervenants : {{p.qui}}</p></sc-if><sc-if value="{{p.mine}}" hint-placeholder-val="{{false}}"><span class="bdg b-acc" style="margin-top: 4px">Votre diagnostic et votre entretien</span></sc-if></div></li></sc-for>
 </ol>
 </section>
 </div>
@@ -611,8 +620,8 @@
 <p class="micro" id="h-inv">Votre invitation</p>
 <img src="assets/img/logo-dc-knowing.png" alt="DC-KNOWING" style="height: 30px; width: auto">
 <span class="lockup"><span class="script" style="font-size: 40px; margin-bottom: -14px; position: relative; z-index: 1">Journées</span><span class="wm" style="font-size: 20px">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 124; height: auto; display: block; margin-top: 2px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></span>
-<div style="display: flex; gap: 10px; align-items: stretch; margin-top: 4px">
-<div class="dcard" style="width: 112px"><span class="dlab" style="font-size: 13px">{{invi.dayName}}</span><span class="dnum {{invi.tone}}" style="height: 70px; font-size: 46px">{{invi.dayNum}}</span><span class="dtime" style="font-size: 15px">{{invi.time}}</span></div>
+<div style="display: flex; gap: 8px; align-items: stretch; justify-content: center; flex-wrap: wrap; margin-top: 4px">
+<sc-for list="{{invDays}}" as="v" hint-placeholder-count="1"><div class="dcard" style="width: 84px"><span class="dlab" style="font-size: 11px">{{v.dayName}}</span><span class="dnum {{v.tone}}" style="height: 56px; font-size: 36px">{{v.dayNum}}</span><span class="dtime" style="font-size: 13px">{{v.time}}</span></div></sc-for>
 <div style="text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 2px"><b style="font-family: Poppins, sans-serif; font-style: italic; font-size: 14px">Siège du Cabinet DC KNOWING</b><span style="font-family: Poppins, sans-serif; font-style: italic; font-size: 13px">Cocody Riviera 2, Collège André Malraux</span><span class="hint" style="margin-top: 4px">{{invi.who}}</span></div>
 </div>
 </div>
@@ -624,8 +633,8 @@
 
 <section class="card up d2" style="padding: 20px; display: flex; flex-direction: column; gap: 10px" aria-labelledby="h-ent">
 <p class="micro" id="h-ent">Mon entretien</p>
-<sc-if value="{{hasSlot}}" hint-placeholder-val="{{false}}"><p style="font-size: 15px"><b>{{slotL}}</b><br><span class="muted" style="font-size: 13px">20 minutes avec un conseiller, votre rapport en main.</span></p><button type="button" class="btn btn-g btn-sm" data-son="clic" onClick="{{openSlot}}" style="align-self: flex-start">Changer de créneau</button></sc-if>
-<sc-if value="{{noSlot}}" hint-placeholder-val="{{true}}"><p style="font-size: 14px" class="muted">Réservez 20 minutes avec un conseiller pour passer votre plan d’action en revue.</p><button type="button" class="btn btn-p btn-sm" data-son="clic" onClick="{{openSlot}}" style="align-self: flex-start" disabled="{{noDoneDiag}}">Réserver un créneau</button></sc-if>
+<sc-if value="{{hasSlot}}" hint-placeholder-val="{{false}}"><p style="font-size: 15px"><b>{{slotL}}</b><br><span class="muted" style="font-size: 13px">45 minutes avec un expert, votre rapport en main.</span></p><button type="button" class="btn btn-g btn-sm" data-son="clic" onClick="{{openSlot}}" style="align-self: flex-start">Changer de créneau</button></sc-if>
+<sc-if value="{{noSlot}}" hint-placeholder-val="{{true}}"><p style="font-size: 14px" class="muted">Réservez 45 minutes avec un expert pour passer votre plan d’action en revue.</p><button type="button" class="btn btn-p btn-sm" data-son="clic" onClick="{{openSlot}}" style="align-self: flex-start" disabled="{{noDoneDiag}}">Réserver un créneau</button></sc-if>
 </section>
 
 <section class="card up d3 dk" style="padding: 20px; display: flex; flex-direction: column; gap: 8px; background: #000000; color: #FFFFFF; border-color: #000000">
@@ -701,11 +710,13 @@
 <div class="mdl" role="dialog" aria-modal="true" aria-labelledby="t-slot" style="width: min(560px, 100%)">
 <div class="mh"><h3 id="t-slot" style="font-size: 18px">Réserver votre entretien individuel</h3><button type="button" class="btn btn-g btn-ic btn-sm" onClick="{{closeModal}}" aria-label="Fermer" style="width: 36px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
 <div class="mb" style="display: flex; flex-direction: column; gap: 14px">
-<p class="muted">{{jourL}} · siège DC-KNOWING, Cocody Riviera 2 · 20 minutes avec un conseiller, votre rapport en main.</p>
+<div role="group" aria-label="Choisir le jour" style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{slotDays}}" as="d" hint-placeholder-count="2"><button type="button" class="{{d.cls}}" aria-pressed="{{d.pressed}}" onClick="{{d.pick}}">{{d.l}}</button></sc-for></div>
+<p class="muted">{{jourL}} · siège DC-KNOWING, Cocody Riviera 2 · 45 minutes avec un expert (accueil compris), votre rapport en main.</p>
+<sc-if value="{{jourAjoute}}" hint-placeholder-val="{{false}}"><p class="hint">Plus de place sur vos jours : ce jour sera ajouté à votre visite.</p></sc-if>
 <div role="group" aria-label="Créneaux disponibles" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px">
 <sc-for list="{{slots}}" as="s" hint-placeholder-count="12"><button type="button" class="{{s.cls}} m" aria-pressed="{{s.pressed}}" onClick="{{s.pick}}" disabled="{{s.dis}}" aria-label="{{s.aria}}">{{s.t}}</button></sc-for>
 </div>
-<p class="hint">Créneaux barrés : déjà réservés.</p>
+<p class="hint">Créneaux grisés : complets.</p>
 </div>
 <div class="mf"><button type="button" class="btn btn-g" onClick="{{closeModal}}">Annuler</button><button type="button" class="btn btn-a" onClick="{{confirmSlot}}" disabled="{{noPick}}">Confirmer le créneau</button></div>
 </div>
@@ -718,11 +729,12 @@
 <div class="mh"><span class="micro">Journées Portes Ouvertes · 16–18 déc. 2026</span><button type="button" class="btn btn-g btn-ic btn-sm" onClick="{{closeModal}}" aria-label="Fermer" style="width: 36px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
 <div class="mb" style="display: flex; flex-direction: column; gap: 16px">
 <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap">
-<div><h2 style="font-size: 20px">Programme de l’événement</h2><p class="hint">Siège DC-KNOWING, Cocody Riviera 2 · programme indicatif, horaires à confirmer</p></div>
+<div><h2 style="font-size: 20px">Programme de l’événement</h2><p class="hint">Siège DC-KNOWING, Cocody Riviera 2 · programme indicatif</p></div>
 <div role="group" aria-label="Choisir le jour" style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{progDays}}" as="d" hint-placeholder-count="3"><button type="button" class="{{d.cls}}" aria-pressed="{{d.pressed}}" onClick="{{d.pick}}">{{d.l}}</button></sc-for></div>
 </div>
+<sc-if value="{{venir}}" hint-placeholder-val="{{false}}"><span class="bdg b-ok" style="align-self: flex-start">Vous venez ce jour-là</span></sc-if>
 <ol style="list-style: none; margin: 4px 0 0; padding: 0">
-<sc-for list="{{progItems}}" as="p" hint-placeholder-count="5"><li class="prog"><span class="t">{{p.t}}</span><span class="l"><i class="{{p.dot}}"></i></span><div class="c"><b style="font-size: 14px">{{p.title}}</b><sc-if value="{{p.hasD}}" hint-placeholder-val="{{true}}"><p class="hint">{{p.d}}</p></sc-if><sc-if value="{{p.mine}}" hint-placeholder-val="{{false}}"><span class="bdg b-acc" style="margin-top: 4px">Votre diagnostic et votre entretien</span></sc-if></div></li></sc-for>
+<sc-for list="{{progItems}}" as="p" hint-placeholder-count="5"><li class="prog"><span class="t">{{p.t}}</span><span class="l"><i class="{{p.dot}}"></i></span><div class="c"><b style="font-size: 14px">{{p.title}}</b><sc-if value="{{p.hasD}}" hint-placeholder-val="{{true}}"><p class="hint">{{p.d}}</p></sc-if><sc-if value="{{p.hasQui}}" hint-placeholder-val="{{false}}"><p class="hint">Intervenants : {{p.qui}}</p></sc-if><sc-if value="{{p.mine}}" hint-placeholder-val="{{false}}"><span class="bdg b-acc" style="margin-top: 4px">Votre diagnostic et votre entretien</span></sc-if></div></li></sc-for>
 </ol>
 </div>
 <div class="mf"><button type="button" class="btn btn-g" onClick="{{closeModal}}">Fermer</button><button type="button" class="btn btn-a" onClick="{{startFromModal}}">Faire mon diagnostic</button></div>
@@ -739,7 +751,7 @@
 <img src="assets/img/logo-dc-knowing.png" alt="DC-KNOWING — The bespoke partner" style="height: 44px; width: auto; margin-top: -8px">
 <p style="font-family: Poppins, sans-serif; font-style: italic; font-size: 14px; letter-spacing: .4em">vous invite à</p>
 <h2 id="t-inv" style="margin: 0"><span class="lockup"><span class="script" style="font-size: 56px; margin-bottom: -20px; position: relative; z-index: 1">Journées</span><span class="wm" style="font-size: 28px">PORTES OUVERTES</span><svg viewBox="0 0 300 44" aria-hidden="true" style="width: 170; height: auto; display: block; margin-top: 2px"><path d="M8 13 C 90 4, 210 2, 294 6 C 297 8, 293 10, 288 10 C 200 11, 100 16, 10 20 C 4 20, 2 15, 8 13 Z" fill="#000000"></path><path d="M64 38 C 120 27, 190 21, 252 18 C 257 18, 257 21, 252 22 C 190 27, 128 34, 68 42 C 60 43, 58 40, 64 38 Z" fill="#000000"></path></svg></span></h2>
-<div class="dcard" style="width: 150px"><span class="dlab" style="font-size: 15px">{{invi.dayName}}</span><span class="dnum {{invi.tone}}" style="height: 92px; font-size: 62px">{{invi.dayNum}}</span><span class="dtime" style="font-size: 19px">{{invi.time}}</span></div>
+<div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap"><sc-for list="{{invDays}}" as="v" hint-placeholder-count="1"><div class="dcard" style="width: 80px"><span class="dlab" style="font-size: 10px">{{v.dayName}}</span><span class="dnum {{v.tone}}" style="height: 54px; font-size: 34px">{{v.dayNum}}</span><span class="dtime" style="font-size: 12px">{{v.time}}</span></div></sc-for></div>
 <p style="font-family: Poppins, sans-serif; font-weight: 800; font-style: italic">Siège du Cabinet DC KNOWING<br><span style="font-weight: 400">Cocody Riviera 2, Collège André Malraux</span></p>
 </div>
 <div class="perf" style="padding: 20px 24px 24px; display: flex; gap: 16px; align-items: center">

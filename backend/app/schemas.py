@@ -49,7 +49,8 @@ class DepotForm(BaseModel):
     contact_email: str = Field(max_length=200)
     contact_telephone: str = Field(min_length=6, max_length=30)
     type_client: Literal["ACTUEL", "REACTIVER", "PROSPECT"]
-    jour_evenement: str
+    jour_evenement: str                      # premier jour de visite
+    jours_visite: list[str] = Field(default_factory=list)
     regime_fiscal: Literal["TEE", "RME", "REEL_SIMPLIFIE", "REEL_NORMAL", "NE_SAIT_PAS"]
     fne: Literal["ACTIVE", "EN_COURS_ACTIVATION", "NON_ACTIVE", "NON_APPLICABLE", "NE_SAIT_PAS"]
     dgi: StatutDecl

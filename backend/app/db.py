@@ -5,6 +5,7 @@ Un « job » est une ligne de public.rapports, renvoyée sous la forme d'un dict
 """
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 
 from .supa import Supabase, SupabaseError
@@ -20,8 +21,9 @@ COLONNES = {
     "erreur_publique": "erreur_publique", "rappel_demande": "rappel_demande", "rappel_effectue": "rappel_effectue",
     "entretien_realise": "entretien_realise", "completed_at": "termine_le", "traitement_depuis": "traitement_depuis",
 }
+DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # clés rangées dans la colonne JSON « donnees »
-DONNEES = ("resultat_ia", "alertes", "plan_action", "resume")
+DONNEES = ("resultat_ia", "alertes", "plan_action", "resume", "rappels")
 STATUT_GLOBAL = {"ERREUR": "erreur", "ENVOYE": "envoye", "TERMINE": "genere"}
 
 
@@ -47,6 +49,7 @@ def _job(row: dict) -> dict:
         "id": row["id"], "ref": row["reference"], "owner": row["user_id"], "email": row["email"], "titre": row["titre"],
         "statut": row["etape"], "statut_global": row["statut"], "progression": row["progression"],
         "jour_evenement": str(row["jour_evenement"]), "secteur": row["secteur"], "form": row["formulaire"],
+        "jours_visite": [str(j) for j in row.get("jours_visite") or [row["jour_evenement"]]],
         "resultat_ia": d.get("resultat_ia"), "alertes": d.get("alertes") or [], "plan_action": d.get("plan_action") or [],
         "resume": d.get("resume") or {}, "donnees": d, "journal": row.get("journal") or [],
         "score_performance": row["score_performance"], "grade_performance": row["grade_performance"],
@@ -110,7 +113,9 @@ class Database:
     def list_jobs(self, jour: str | None = None, statut: str | None = None, owner: str | None = None, limit: int = 500) -> list[dict]:
         params = {"select": "*", "order": "created_at.desc", "limit": str(limit)}
         if jour:
-            params["jour_evenement"] = f"eq.{jour}"
+            if not DATE.match(jour):
+                return []
+            params["jours_visite"] = f"cs.{{{jour}}}"  # tous les dossiers dont ce jour fait partie de la visite
         if statut:
             params["etape"] = f"eq.{statut}"
         if owner:

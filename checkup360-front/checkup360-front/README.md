@@ -121,11 +121,11 @@ Champs lus pour chaque ligne : `id`, `reference`, `nom_reel`, `type_client`, `se
 
 ## À compléter avant l'événement
 
-- **Programme** : créneaux indicatifs dans `app-visiteur.js` (`K.PROG`), à remplacer par le programme validé.
+- **Programme** : `K.PROG` dans `app-visiteur.js` (programme du 26/11/2026, « indicatif » tant que la direction n’a pas validé ; panel 2 et intervenants à confirmer).
 - **Code QR de l'invitation** : dessin décoratif ; à remplacer par un vrai QR fourni par la backend.
 - **Police « Journées »** : la charte utilise Amsterdam (police commerciale). En attendant, « Mrs Saint Delafield »
   est utilisée. Pour l'intégrer : ajoutez le fichier dans `assets/fonts/` et un `@font-face { font-family: Amsterdam; src: url(../fonts/amsterdam.woff2) }` en tête de `jpo.css`.
-- **Créneaux d'entretien** : liste dans `K.SLOTS` (le jeudi commence à 10h30).
+- **Créneaux d’entretien** (45 min) : `K.SLOTS` côté front et `backend/app/evenement.py` côté serveur, à garder identiques.
 - **rapport.html** sert de modèle visuel pour `templates/rapport.html.j2`. WeasyPrint ne gère pas `conic-gradient` :
   les anneaux de score doivent y être générés en SVG (comme prévu dans la spec, section 11).
 

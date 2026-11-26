@@ -32,13 +32,43 @@ class Component extends DCLogic {
         ['Documents', 'Vos documents comptables', 'Jusqu’à 10 fichiers. La balance générale suffit souvent ; à défaut, déposez tous vos journaux et relevés dans « Autres documents ».'],
         ['Vérification', 'Vérifiez et lancez', 'Un dernier coup d’œil avant l’analyse. Vous pouvez modifier chaque bloc.']
       ],
-      SLOTS: ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'],
+      JOURS: ['2026-12-16', '2026-12-17', '2026-12-18'],
+      COURT: { '2026-12-16': 'Mer. 16', '2026-12-17': 'Jeu. 17', '2026-12-18': 'Ven. 18' },
+      MOYEN: { '2026-12-16': 'Mercredi 16 décembre', '2026-12-17': 'Jeudi 17 décembre', '2026-12-18': 'Vendredi 18 décembre' },
+      VISITE: { '2026-12-16': ['Mercredi 16 décembre · 08h30', 'Ouverture et entretiens individuels'], '2026-12-17': ['Jeudi 17 décembre · 10h30', 'Panels (fiscalité, bénéficiaire effectif, IA) et entretiens individuels'], '2026-12-18': ['Vendredi 18 décembre · 08h30', 'Plénière de clôture et démonstration de La Suite Flow'] },
+      /* Un entretien occupe 45 minutes. Mêmes créneaux côté serveur (backend/app/evenement.py). */
+      SLOTS: { '2026-12-16': ['09:00', '09:45', '10:30', '11:15', '12:00', '14:00', '14:45', '15:30'], '2026-12-17': ['14:15', '15:00', '15:45', '16:30'], '2026-12-18': ['14:00', '14:45'] },
       STAGES: [['Lecture', 'Fichiers, encodage, OCR'], ['Analyse', 'Extraction IA et contrôles'], ['Calcul', 'Indicateurs et scores'], ['Rapport', 'Interprétation et rapport Word'], ['Envoyé', 'E-mail et Mes diagnostics']],
       ETAPE: { EN_ATTENTE: 0, LECTURE: 0, MAPPING_IA: 1, CALCUL: 2, INTERPRETATION: 3, PDF: 3, ENVOYE: 5 },
+      /* [heure, titre, détail, repère ('diag' | 'panel' | 'pleniere'), intervenants (facultatif, masqué si vide)] */
       PROG: {
-        '2026-12-16': [['08:30', 'Accueil des visiteurs', 'Enregistrement et remise des badges'], ['09:00', 'Ouverture par le cabinet DC-KNOWING', ''], ['09:30', 'Check-up 360 et entretiens individuels', 'En continu jusqu’à 17h30', 'diag'], ['10:30', 'Présentation des 5 applications de La Suite Flow', 'Sell, RH, Compta, Legal, Task'], ['14:30', 'Atelier : la FNE en pratique', 'Avec Flow Sell et Flow Compta'], ['16:30', 'Démonstrations libres', '']],
-        '2026-12-17': [['10:30', 'Accueil des visiteurs', 'Enregistrement et remise des badges'], ['11:00', 'Présentation de La Suite Flow', ''], ['11:00', 'Check-up 360 et entretiens individuels', 'En continu jusqu’à 17h30', 'diag'], ['14:30', 'Atelier : paie et déclarations sociales', 'Avec Flow RH'], ['16:00', 'Démonstrations Flow Legal et Flow Task', '']],
-        '2026-12-18': [['08:30', 'Accueil des visiteurs', 'Enregistrement et remise des badges'], ['09:30', 'Check-up 360 et entretiens individuels', 'En continu jusqu’à 17h00', 'diag'], ['10:30', 'Présentation des 5 applications de La Suite Flow', ''], ['14:30', 'Atelier : piloter sa trésorerie', 'Avec Flow Compta'], ['17:00', 'Clôture des Journées', '']]
+        '2026-12-16': [
+          ['08:30', 'Accueil des visiteurs', 'Enregistrement, badges, café'],
+          ['08:45', 'Ouverture des Journées Portes Ouvertes', 'Mot de bienvenue de la direction et présentation du parcours des 3 jours'],
+          ['09:00', 'Entretiens individuels Check-up 360', 'Sur rendez-vous, jusqu’à 12h45', 'diag'],
+          ['12:45', 'Pause', ''],
+          ['14:00', 'Entretiens individuels Check-up 360', 'Sur rendez-vous, jusqu’à 16h30', 'diag']
+        ],
+        '2026-12-17': [
+          ['10:30', 'Accueil des participants', 'Enregistrement, café, mot d’introduction'],
+          ['11:00', 'Panel 1 · Fiscalité 2027 : ce qui change pour votre entreprise', 'FNE, contrôles, régime fiscal, pénalités · échanges et questions du public', 'panel', ''],
+          ['11:45', 'Panel 2 · Bénéficiaire effectif : qui possède vraiment votre entreprise ?', 'Obligations de déclaration, risques, exigences des banques · échanges et questions', 'panel', ''],
+          ['12:30', 'Panel 3 · L’intelligence artificielle dans l’entreprise', 'Ce que l’IA peut faire dès aujourd’hui dans une PME, et ses limites · échanges et questions', 'panel', ''],
+          ['13:15', 'Déjeuner et échanges', ''],
+          ['14:15', 'Entretiens individuels Check-up 360', 'Sur rendez-vous, jusqu’à 17h30', 'diag']
+        ],
+        '2026-12-18': [
+          ['08:30', 'Accueil des participants', 'Enregistrement, café'],
+          ['09:00', 'Ouverture par la direction', ''],
+          ['09:10', 'Ce que nous avons vu en deux jours', 'Bilan anonymisé des diagnostics : les risques et les leviers les plus fréquents', 'pleniere'],
+          ['09:40', 'Deux entreprises, deux situations', 'L’entreprise équipée face à l’entreprise non équipée', 'pleniere'],
+          ['09:55', 'Démonstration en direct de La Suite Flow', 'Facture FNE, comptabilité sans ressaisie, paie', 'pleniere'],
+          ['10:40', 'Témoignage client', '', 'pleniere'],
+          ['10:55', 'L’offre des Journées Portes Ouvertes', 'Valable jusqu’au 31 décembre 2026', 'pleniere'],
+          ['11:10', 'Questions, échanges et prise de rendez-vous', ''],
+          ['11:45', 'Clôture et cocktail', 'Photo de groupe'],
+          ['14:00', 'Entretiens individuels de rattrapage', 'Pour ceux qui n’ont pas pu venir mercredi ou jeudi · sur rendez-vous, jusqu’à 16h00', 'diag']
+        ]
       }
     };
     this.state = this.initial();
@@ -46,19 +76,19 @@ class Component extends DCLogic {
   initial() {
     return { screen: 'accueil', step: 1, f: this.emptyForm(), files: {}, err: {}, dragSlot: null, modal: null, busy: false, toasts: [],
       stage: 0, logs: [], pct: 0, elapsed: 0, failed: false, done: false, job: '', jobId: null, result: null, count: { p: 0, c: 0 }, confetti: false,
-      slot: null, slotPick: null, taken: [], dl: null,
+      rdv: null, slotPick: null, slotDayPick: null, takenBy: {}, dl: null,
       user: null, auth: { step: 'email', email: '', code: '', err: null, busy: false, resendIn: 0, intent: 'diag' }, diags: [], diagsLoading: false, progDay: '2026-12-16' };
   }
   emptyForm() {
-    return { raison: '', ncc: '', secteur: '', effectif: '', typeClient: '', jour: '2026-12-16', nom: '', tel: '', regime: '', fne: '', statuts: { DGI: '', CNPS: '', ITS: '', CMU: '', DISA: '' }, tva: '', consent: false };
+    return { raison: '', ncc: '', secteur: '', effectif: '', typeClient: '', jours: [], creneau: '', nom: '', tel: '', regime: '', fne: '', statuts: { DGI: '', CNPS: '', ITS: '', CMU: '', DISA: '' }, tva: '', consent: false };
   }
   sampleForm() {
-    return { raison: 'Entreprise Exemple SARL', ncc: '', secteur: 'Commerce et distribution', effectif: '24', typeClient: 'PROSPECT', jour: '2026-12-16', nom: 'Aïcha Koné', tel: '07 00 00 00 00', regime: 'REEL_SIMPLIFIE', fne: 'NON_ACTIVE', statuts: { DGI: 'A_JOUR', CNPS: 'A_JOUR', ITS: 'A_JOUR', CMU: 'EN_RETARD', DISA: 'A_JOUR' }, tva: 'NON', consent: false };
+    return { raison: 'Entreprise Exemple SARL', ncc: '', secteur: 'Commerce et distribution', effectif: '24', typeClient: 'PROSPECT', jours: ['2026-12-16'], creneau: '', nom: 'Aïcha Koné', tel: '07 00 00 00 00', regime: 'REEL_SIMPLIFIE', fne: 'NON_ACTIVE', statuts: { DGI: 'A_JOUR', CNPS: 'A_JOUR', ITS: 'A_JOUR', CMU: 'EN_RETARD', DISA: 'A_JOUR' }, tva: 'NON', consent: false };
   }
   componentDidMount() {
     const s = API.session();
     const draft = this.loadDraft();
-    this.setState({ user: s ? { email: s.email } : null, f: draft || this.state.f, progDay: (draft && draft.jour) || '2026-12-16' }, () => { if (s) this.refreshDiags(); });
+    this.setState({ user: s ? { email: s.email } : null, f: draft || this.state.f, progDay: (draft && draft.jours[0]) || '2026-12-16' }, () => { if (s) this.refreshDiags(); });
     this.tick = setInterval(() => {
       const a = this.state.auth;
       if (a.resendIn > 0) this.setState({ auth: { ...a, resendIn: a.resendIn - 1 } });
@@ -76,12 +106,16 @@ class Component extends DCLogic {
     if (this.state.modal && ps.modal !== this.state.modal) setTimeout(() => { try { const b = document.querySelector('.mdl .mf .btn-a, .mdl .mf .btn-p, .mdl button'); if (b) b.focus(); } catch (e) {} }, 40);
     if (this.state.screen === 'auth' && this.state.auth.step === 'code' && ps.auth.step !== 'code') setTimeout(() => { try { const i = document.getElementById('a-code'); if (i) i.focus(); } catch (e) {} }, 60);
     if (ps.f !== this.state.f && this.state.screen === 'form') this.saveDraft();
+    const etapeVous = this.state.screen === 'form' && this.state.step === 2;
+    if (etapeVous && (ps.screen !== 'form' || ps.step !== 2)) this.loadTaken(this.K.JOURS);
     if (ps.screen !== this.state.screen) {
       if (this.state.screen === 'espace') { this.refreshDiags(); this.startPoll(); } else this.stopPoll();
     }
   }
   saveDraft() { try { const { consent, ...rest } = this.state.f; localStorage.setItem('ck_draft', JSON.stringify(rest)); } catch (e) {} }
-  loadDraft() { try { const d = JSON.parse(localStorage.getItem('ck_draft')); return d ? { ...this.emptyForm(), ...d, consent: false } : null; } catch (e) { return null; } }
+  loadDraft() { try { const d = JSON.parse(localStorage.getItem('ck_draft')); if (!d) return null;
+    const jours = d.jours || (d.jour ? [d.jour] : []); // brouillon enregistré avant le choix multiple
+    return { ...this.emptyForm(), ...d, jours, consent: false }; } catch (e) { return null; } }
   clearDraft() { try { localStorage.removeItem('ck_draft'); } catch (e) {} }
 
   /* Écrans de démonstration (?ecran=...) — uniquement en mode démo */
@@ -118,6 +152,27 @@ class Component extends DCLogic {
   fmtSize(b) { return b >= 1000000 ? (b / 1000000).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round(b / 1000)) + ' Ko'; }
   fmtT(sec) { const s = Math.max(0, Math.round(sec)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
   validEmail(x) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((x || '').trim()); }
+
+  /* ---------- jours de visite et créneaux ---------- */
+  setJours(jours) {
+    this.setState((s) => {
+      const tries = this.K.JOURS.filter((j) => jours.includes(j));
+      const creneau = s.f.creneau && tries.includes(s.f.creneau.split(' ')[0]) ? s.f.creneau : '';
+      return { f: { ...s.f, jours: tries, creneau }, err: { ...s.err, jours: null } };
+    });
+  }
+  loadTaken(days) {
+    days.forEach((d) => API.slots(d).then((r) => this.setState((s) => ({ takenBy: { ...s.takenBy, [d]: (r && r.pris) || [] } }))).catch(() => {}));
+  }
+  hasFree(day) { const pris = this.state.takenBy[day] || []; return this.K.SLOTS[day].some((t) => !pris.includes(t)); }
+  /* Jours de visite et entretien du visiteur : ceux de son dernier diagnostic, sinon ceux du formulaire */
+  mesJours() { const d = this.state.diags[0]; return d && d.joursVisite && d.joursVisite.length && this.state.screen !== 'form' ? d.joursVisite : this.state.f.jours; }
+  monRdv() {
+    if (this.state.rdv) return this.state.rdv;
+    const d = this.state.diags.find((x) => x.entretien);
+    return d ? { jour: d.entretienJour || d.joursVisite[0], heure: d.entretien } : null;
+  }
+  slotL(rdv) { return rdv ? (this.K.MOYEN[rdv.jour] || '') + ' à ' + rdv.heure : ''; }
 
   /* ---------- Mes diagnostics ---------- */
   refreshDiags() {
@@ -165,7 +220,7 @@ class Component extends DCLogic {
   /* ---------- formulaire ---------- */
   newDiag() {
     this.fileObjs = {};
-    this.setState((s) => ({ screen: 'form', step: 1, modal: null, err: {}, files: {}, result: null, f: s.f.raison && !s.job ? s.f : { ...this.emptyForm(), nom: s.f.nom, tel: s.f.tel, typeClient: s.f.typeClient, jour: s.f.jour || '2026-12-16' } }));
+    this.setState((s) => ({ screen: 'form', step: 1, modal: null, err: {}, files: {}, result: null, f: s.f.raison && !s.job ? s.f : { ...this.emptyForm(), nom: s.f.nom, tel: s.f.tel, typeClient: s.f.typeClient, jours: s.f.jours, creneau: '' } }));
   }
   validate(step) {
     const s = this.state, f = s.f, e = {};
@@ -180,6 +235,7 @@ class Component extends DCLogic {
       const d = f.tel.replace(/\D/g, '').replace(/^225(?=\d{10}$)/, '');
       if (d.length !== 10) e.tel = 'Numéro incomplet : 10 chiffres attendus.';
       if (!f.typeClient) e.typeClient = 'Choisissez une réponse.';
+      if (!f.jours.length) e.jours = 'Cochez au moins un jour.';
     }
     if (step === 3) {
       if (!f.regime) e.regime = 'Choisissez une réponse.';
@@ -226,7 +282,8 @@ class Component extends DCLogic {
     return {
       raison_sociale: f.raison.trim(), ncc: f.ncc.trim() || null, secteur: f.secteur, effectif: Number(f.effectif),
       contact_nom: f.nom.trim(), contact_email: this.state.user ? this.state.user.email : '', contact_telephone: f.tel.replace(/\s+/g, ''),
-      type_client: f.typeClient, jour_evenement: f.jour,
+      type_client: f.typeClient, jour_evenement: f.jours[0], jours_visite: f.jours,
+      creneau_entretien: f.creneau ? { jour: f.creneau.split(' ')[0], heure: f.creneau.split(' ')[1] } : null,
       regime_fiscal: f.regime, fne: nsp(f.fne),
       statut_dgi: nsp(f.statuts.DGI), statut_cnps: nsp(f.statuts.CNPS), statut_its: nsp(f.statuts.ITS), statut_cmu: nsp(f.statuts.CMU), statut_disa: nsp(f.statuts.DISA),
       tva_exoneree: f.tva === 'OUI', consentement_artci: !!f.consent
@@ -241,7 +298,8 @@ class Component extends DCLogic {
     API.createDiagnostic(this.payload(), files).then((r) => {
       const id = r.job_id || r.id;
       this.clearDraft();
-      this.setState({ busy: false, screen: 'suivi', stage: 0, logs: [], pct: 0, elapsed: 0, failed: false, done: false, job: r.reference || id, jobId: id }, () => this.follow(id));
+      if (r.entretien_refuse) this.toast('info', 'Créneau déjà pris', 'Choisissez un autre créneau d’entretien depuis votre résultat.');
+      this.setState({ rdv: null, busy: false, screen: 'suivi', stage: 0, logs: [], pct: 0, elapsed: 0, failed: false, done: false, job: r.reference || id, jobId: id }, () => this.follow(id));
       this.refreshDiags();
     }).catch((e) => {
       this.setState({ busy: false });
@@ -278,7 +336,7 @@ class Component extends DCLogic {
       if (ev.etape === 'ENVOYE') {
         this.setState({ done: true, pct: 100, stage: 5 });
         API.getDiagnostic(id).then((d) => {
-          this.later(() => { Sons.jouer('pret'); this.setState({ screen: 'resultat', result: d, confetti: true, slot: d && d.entretien }); this.finish(d); }, 900);
+          this.later(() => { Sons.jouer('pret'); this.setState({ screen: 'resultat', result: d, confetti: true, rdv: d && d.entretien ? { jour: d.entretienJour, heure: d.entretien } : null }); this.finish(d); }, 900);
           this.refreshDiags();
         }).catch((e) => this.fail(e, 'Résultat indisponible'));
       }
@@ -307,7 +365,7 @@ class Component extends DCLogic {
   }
   goHomeNow() {
     this.clearT(); if (this.unsub) { this.unsub(); this.unsub = null; }
-    this.setState((s) => ({ ...this.initial(), user: s.user, diags: s.diags, f: s.screen === 'form' ? s.f : { ...this.emptyForm(), nom: s.f.nom, tel: s.f.tel, jour: s.f.jour } }));
+    this.setState((s) => ({ ...this.initial(), user: s.user, diags: s.diags, f: s.screen === 'form' ? s.f : { ...this.emptyForm(), nom: s.f.nom, tel: s.f.tel, jours: s.f.jours } }));
   }
   qrCells() {
     const n = 21, out = [];
@@ -316,8 +374,9 @@ class Component extends DCLogic {
     return out;
   }
   openSlotFor(diagId) {
-    this.setState((s) => ({ modal: 'slot', slotPick: s.slot, slotDiag: diagId, taken: [] }));
-    API.slots(this.state.f.jour).then((r) => this.setState({ taken: (r && r.pris) || [] })).catch(() => {});
+    const rdv = this.monRdv();
+    this.setState({ modal: 'slot', slotPick: rdv ? rdv.heure : null, slotDayPick: rdv ? rdv.jour : null, slotDiag: diagId, takenBy: {} });
+    this.loadTaken(this.K.JOURS);
   }
 
   renderVals() {
@@ -335,14 +394,17 @@ class Component extends DCLogic {
     const goStep = (n) => () => this.setState({ step: n, err: {} });
     const userEmail = (s.user && s.user.email) || '';
     const fileList = Object.values(s.files);
+    const court = (jours) => jours.map((j) => K.COURT[j]).join(' · ');
+    const visiteL = f.jours.length ? court(f.jours) : '—';
+    const creneauL = f.creneau ? K.COURT[f.creneau.split(' ')[0]] + ' à ' + f.creneau.split(' ')[1] : 'À réserver';
     const recap = [
       { t: 'Entreprise', edit: goStep(1), editL: 'Modifier l’entreprise', rows: [{ l: 'Raison sociale', v: f.raison || '—' }, { l: 'Secteur', v: f.secteur || '—' }, { l: 'Effectif', v: f.effectif ? f.effectif + ' salarié(s)' : '—' }] },
-      { t: 'Vous', edit: goStep(2), editL: 'Modifier vos coordonnées', rows: [{ l: 'Nom', v: f.nom || '—' }, { l: 'E-mail', v: userEmail || '—' }, { l: 'Visite', v: label(K.JOUR, f.jour) }] },
+      { t: 'Vous', edit: goStep(2), editL: 'Modifier vos coordonnées', rows: [{ l: 'Nom', v: f.nom || '—' }, { l: 'E-mail', v: userEmail || '—' }, { l: 'Visite', v: visiteL }, { l: 'Entretien', v: creneauL }] },
       { t: 'Fiscalité', edit: goStep(3), editL: 'Modifier la fiscalité', rows: [{ l: 'Régime', v: label(K.REGIME, f.regime) }, { l: 'FNE', v: fneLabel }, { l: 'TVA exonérée', v: f.tva === 'OUI' ? 'Oui' : f.tva === 'NON' ? 'Non' : '—' }] },
       { t: 'Obligations', edit: goStep(4), editL: 'Modifier les obligations', rows: K.OBL.map(([k]) => ({ l: k, v: f.statuts[k] ? label(K.STAT, f.statuts[k]) : '—' })) },
       { t: 'Documents', edit: goStep(5), editL: 'Modifier les documents', rows: fileList.length ? fileList.map((x) => ({ l: x.ext.toUpperCase(), v: x.name })) : [{ l: 'Fichiers', v: 'Aucun' }] }
     ];
-    const summary = [{ l: 'Entreprise', v: f.raison || '—' }, { l: 'Secteur', v: f.secteur || '—' }, { l: 'Visite', v: label(K.JOUR, f.jour) }, { l: 'E-mail', v: userEmail || '—' }, { l: 'Fichiers', v: fileList.length + ' / ' + K.MAX_FILES }];
+    const summary = [{ l: 'Entreprise', v: f.raison || '—' }, { l: 'Secteur', v: f.secteur || '—' }, { l: 'Visite', v: visiteL }, { l: 'Entretien', v: creneauL }, { l: 'E-mail', v: userEmail || '—' }, { l: 'Fichiers', v: fileList.length + ' / ' + K.MAX_FILES }];
     const full = fileList.length >= K.MAX_FILES;
     const autres = Object.keys(s.files).filter((k) => k.startsWith('autre:'));
     const docSlots = K.DOCS.flatMap(([k0, l, d, rec]) => (k0 === 'autre' ? [...autres, 'autre'] : [k0]).map((k) => {
@@ -370,7 +432,16 @@ class Component extends DCLogic {
     const logs = s.logs.map((l) => ({ ...l, color: l.kind === 'bad' ? '#FCA5A5' : l.kind === 'warn' ? '#FCD34D' : l.kind === 'ok' ? '#86EFAC' : '#FFFFFF' }));
     const palette = ['#FFD700', '#000000', '#F2C200', '#FEF9E7', '#262626'];
     const confettiPieces = Array.from({ length: 34 }, (_, i) => ({ x: (i * 37 + 7) % 100, w: 6 + (i % 4) * 2, h: 10 + (i % 3) * 4, bg: palette[i % 5], d: ((i * 13) % 20) / 20 }));
-    const slots = K.SLOTS.filter((t) => f.jour !== '2026-12-17' || t >= '10:30').map((t) => { const taken = (s.taken || []).includes(t); const sel = s.slotPick === t; return { t, dis: taken, cls: sel ? 'seg on-a' : 'seg', pressed: sel ? 'true' : 'false', aria: taken ? t + ', déjà réservé' : t, pick: () => this.setState({ slotPick: t }) }; });
+    const jourOpts = K.JOURS.map((j) => { const sel = f.jours.includes(j); return { l: K.VISITE[j][0], d: K.VISITE[j][1], checked: sel, cls: sel ? 'jchk on' : 'jchk', toggle: () => this.setJours(sel ? f.jours.filter((x) => x !== j) : [...f.jours, j]) }; });
+    const creneauBtns = (day, pickedKey, pick) => K.SLOTS[day].map((t) => { const taken = (s.takenBy[day] || []).includes(t); const sel = pickedKey === day + ' ' + t; return { t, dis: taken, cls: sel ? 'seg on-a' : 'seg', pressed: sel ? 'true' : 'false', aria: K.MOYEN[day] + ' ' + t + (taken ? ', complet' : ''), pick: () => pick(day, t) }; });
+    const formSlots = f.jours.map((day) => ({ day, l: K.MOYEN[day] + (day === '2026-12-18' ? ' · rattrapage, pour ceux qui n’ont pas pu venir mercredi ou jeudi' : ''), slots: creneauBtns(day, f.creneau, (d, t) => this.setState((st) => ({ f: { ...st.f, creneau: st.f.creneau === d + ' ' + t ? '' : d + ' ' + t } }))) }));
+    // Fenêtre de réservation : les jours de la visite ; tous les jours s'ils sont complets (le jour choisi sera ajouté)
+    const mine = this.mesJours();
+    const mineFree = mine.filter((d) => this.hasFree(d));
+    const modalDays = mineFree.length ? mine : K.JOURS;
+    const dayPick = s.slotDayPick && modalDays.includes(s.slotDayPick) ? s.slotDayPick : (mineFree[0] || modalDays.find((d) => this.hasFree(d)) || modalDays[0]);
+    const slotDays = modalDays.map((d) => ({ l: K.COURT[d], cls: dayPick === d ? 'daytab on' : 'daytab', pressed: dayPick === d ? 'true' : 'false', pick: () => this.setState({ slotDayPick: d, slotPick: null }) }));
+    const slots = creneauBtns(dayPick, s.slotPick ? dayPick + ' ' + s.slotPick : '', (d, t) => this.setState({ slotDayPick: d, slotPick: t }));
     const toasts = s.toasts.map((t) => ({ ...t, cls: 't-' + t.kind, ok: t.kind === 'ok', bad: t.kind === 'bad', info: t.kind === 'info', close: () => this.setState((st) => ({ toasts: st.toasts.filter((x) => x.id !== t.id) })) }));
     const closeModal = () => this.setState({ modal: null });
     const a = s.auth;
@@ -380,16 +451,18 @@ class Component extends DCLogic {
       stL: d.st === 'ENVOYE' ? 'Envoyé' : d.st === 'EN_COURS' ? 'En cours' : 'À rappeler', stCls: d.st === 'ENVOYE' ? 'b-ok' : d.st === 'EN_COURS' ? 'b-warn' : 'b-bad',
       gpL: d.perf != null ? d.perf + '/100 (' + (d.gp || grade(d.perf)) + ')' : '', gcL: d.conf != null ? d.conf + '/100 (' + (d.gc || grade(d.conf)) + ')' : '',
       perfAria: 'Performance ' + d.perf + ' sur 100', confAria: 'Conformité ' + d.conf + ' sur 100',
-      entL: d.entretien ? 'entretien à ' + d.entretien : 'rapport envoyé par e-mail',
+      entL: [d.joursVisite && d.joursVisite.length ? 'visite : ' + d.joursVisite.map((j) => this.K.COURT[j]).join(' · ') : '', d.entretien ? 'entretien ' + (this.K.COURT[d.entretienJour] || '') + ' à ' + d.entretien : 'rapport envoyé par e-mail'].filter(Boolean).join(' · '),
       openCls: s.dl === d.id ? 'loading' : '',
       open: () => this.openPdf(d.id, d.ref),
       download: () => this.openPdf(d.id, d.ref),
       follow: () => this.setState({ screen: 'suivi', job: d.ref, jobId: d.id, stage: 0, logs: [], pct: d.pct || 0, failed: false, done: false }, () => this.follow(d.id)) }));
     const nm = (f.nom || '').trim();
     const firstName = nm ? nm.split(' ')[0] : (userEmail ? userEmail.split('@')[0].split(/[._-]/)[0].replace(/^\w/, (c) => c.toUpperCase()) : '');
-    const iv = K.INV[f.jour] || K.INV['2026-12-16'];
-    const invi = { dayName: iv[0], dayNum: iv[1], time: iv[2], tone: iv[3], who: (nm || userEmail || 'Invité') + (f.raison ? ' · ' + f.raison : ''), code: 'JPO-DCK-2026-' + (userEmail.length * 7 % 900 + 100) };
-    const progItems = (K.PROG[s.progDay] || []).map(([t, title, d, tag]) => ({ t, title, d, hasD: !!d, mine: tag === 'diag', dot: tag === 'diag' ? 'hl2' : '' }));
+    const invDays = (mine.length ? mine : ['2026-12-16']).map((j) => ({ dayName: K.INV[j][0], dayNum: K.INV[j][1], time: K.INV[j][2], tone: K.INV[j][3] }));
+    const invi = { who: (nm || userEmail || 'Invité') + (f.raison ? ' · ' + f.raison : ''), code: 'JPO-DCK-2026-' + (userEmail.length * 7 % 900 + 100) };
+    const DOTS = { diag: 'hl2', panel: 'hl3', pleniere: 'hl4' };
+    const progItems = (K.PROG[s.progDay] || []).map(([t, title, d, tag, qui]) => ({ t, title, d, hasD: !!d, mine: tag === 'diag', dot: DOTS[tag] || '', qui: qui || '', hasQui: !!qui }));
+    const rdv = this.monRdv();
     const progDays = K.JOUR.map(([v, l]) => ({ l, cls: s.progDay === v ? 'daytab on' : 'daytab', pressed: s.progDay === v ? 'true' : 'false', pick: () => this.setState({ progDay: v }) }));
     const doneDiags = s.diags.filter((d) => d.st === 'ENVOYE');
     const r = s.result || {};
@@ -411,10 +484,12 @@ class Component extends DCLogic {
 
     return {
       show: { accueil: s.screen === 'accueil', auth: s.screen === 'auth', form: s.screen === 'form', suivi: s.screen === 'suivi', resultat: s.screen === 'resultat', espace: s.screen === 'espace', s1: s.step === 1, s2: s.step === 2, s3: s.step === 3, s4: s.step === 4, s5: s.step === 5, s6: s.step === 6 },
+      jourOpts, formSlots, noDays: !f.jours.length, daysFull: f.jours.length > 0 && !f.jours.some((d) => this.hasFree(d)), slotDays, invDays, venir: mine.includes(s.progDay),
+      allDays: () => this.setJours(K.JOURS),
       m: { notice: s.modal === 'notice', quit: s.modal === 'quit', slot: s.modal === 'slot', programme: s.modal === 'programme', invitation: s.modal === 'invitation', logout: s.modal === 'logout', del: s.modal === 'del' },
       f, err, cls, inv, invi, noErr, on, exempt, notExempt: !exempt, steps, statRows, recap, summary, docSlots, stages, logs, pct, running, slots, toasts, confettiPieces, res,
       secteurs: K.SECTEURS, demo: API.config.mock,
-      typeOpts: seg('typeClient', K.TYPE), jourOpts: seg('jour', K.JOUR, 'on-a'), regimeOpts: seg('regime', K.REGIME), fneOpts: seg('fne', K.FNE),
+      typeOpts: seg('typeClient', K.TYPE), regimeOpts: seg('regime', K.REGIME), fneOpts: seg('fne', K.FNE),
       tvaOpts: seg('tva', [['OUI', 'Oui, exonérée'], ['NON', 'Non']]),
       step: s.step, stepTitle: K.STEPS[s.step - 1][1], stepWhy: K.STEPS[s.step - 1][2], remainForm: s.step === 6 ? 'dernière étape' : 'encore environ ' + remainMin + ' min',
       stepPct: Math.round((s.step - 1) / 6 * 100 + 8),
@@ -424,8 +499,8 @@ class Component extends DCLogic {
       barCls: running ? 'stripes' : '', barColor: s.failed ? '#DC2626' : s.done ? '#15803D' : '#FFD700',
       job: s.job, entreprise: f.raison || 'Votre entreprise', emailShown: userEmail || 'votre adresse e-mail', telShown: f.tel || 'votre numéro',
       count: s.count, confetti: s.confetti,
-      hasSlot: !!s.slot, noSlot: !s.slot, slotL: s.slot ? (K.JOURL[f.jour] || '') + ' à ' + s.slot : '', slotBtn: s.slot ? 'Changer de créneau' : 'Réserver mon entretien',
-      jourL: K.JOURL[f.jour] || '', noPick: !s.slotPick, noDoneDiag: doneDiags.length === 0,
+      hasSlot: !!rdv, noSlot: !rdv, slotL: this.slotL(rdv), slotBtn: rdv ? 'Changer de créneau' : 'Réserver mon entretien',
+      jourL: K.JOURL[dayPick] || '', jourAjoute: !mine.includes(dayPick), noPick: !s.slotPick, noDoneDiag: doneDiags.length === 0,
       launchCls: s.busy ? 'loading' : '', dlCls: s.dl ? 'loading' : '',
       quitTitle: 'Quitter le diagnostic ?', quitText: 'Votre brouillon est conservé sur cet appareil : vous pourrez reprendre plus tard depuis l’accueil.', quitBtn: 'Quitter',
       sonCoche: Sons.estMuet() ? 'false' : 'true', sonCoupe: Sons.estMuet(), sonActif: !Sons.estMuet(), sonBloque: Sons.estBloque(),
@@ -495,7 +570,7 @@ class Component extends DCLogic {
       openSlot: () => this.openSlotFor(s.jobId || (doneDiags[0] && doneDiags[0].id)),
       confirmSlot: () => {
         const t = s.slotPick, id = s.slotDiag || s.jobId || (doneDiags[0] && doneDiags[0].id);
-        API.bookSlot(id, f.jour, t).then(() => { Sons.jouer('rdv_ok'); this.setState({ slot: t, modal: null }); this.toast('ok', 'Entretien confirmé', label(K.JOUR, f.jour) + ' à ' + t); this.refreshDiags(); }).catch((e) => this.fail(e, 'Réservation impossible'));
+        API.bookSlot(id, dayPick, t).then(() => { Sons.jouer('rdv_ok'); this.setState({ rdv: { jour: dayPick, heure: t }, modal: null }); this.toast('ok', 'Entretien confirmé', this.slotL({ jour: dayPick, heure: t })); this.refreshDiags(); }).catch((e) => { this.loadTaken(K.JOURS); this.fail(e, 'Réservation impossible'); });
       },
       askRestart: () => this.newDiag()
     };

@@ -132,6 +132,8 @@
       }),
       alerte: d.alerte_principale || d.alerte || '',
       entretien: d.entretien || null,
+      entretienJour: d.entretien_jour || d.entretienJour || null,
+      joursVisite: d.jours_visite || d.joursVisite || [],
       emailEnvoye: d.email_envoye !== false,
       rapportDispo: d.rapport_disponible !== false
     };
@@ -219,10 +221,10 @@
     createDiagnostic: function (form, files) {
       if (cfg.mock) {
         return sleep(800).then(function () {
-          var code = { '2026-12-16': '1612', '2026-12-17': '1712', '2026-12-18': '1812' }[form.jour_evenement] || '1612';
-          var id = 'JPO-' + code + '-0' + (25 + Math.floor(Math.random() * 60));
+          var id = 'JPO-2026-' + String(25 + Math.floor(Math.random() * 900)).padStart(4, '0');
+          var rdv = form.creneau_entretien || {};
           var list = mockList().filter(function (d) { return d.id !== id; });
-          list.unshift({ id: id, reference: id, entreprise: form.raison_sociale, date: 'À l’instant', statut: 'EN_ATTENTE', progression: 0 });
+          list.unshift({ id: id, reference: id, entreprise: form.raison_sociale, date: 'À l’instant', statut: 'EN_ATTENTE', progression: 0, jours_visite: form.jours_visite, entretien: rdv.heure || null, entretien_jour: rdv.jour || null });
           mockSave(list);
           return { job_id: id, reference: id };
         });
@@ -290,11 +292,11 @@
 
     /* -- Entretien et invitation -- */
     slots: function (jour) {
-      if (cfg.mock) return sleep(150).then(function () { return { pris: ['09:30', '10:30', '14:00', '15:30'] }; });
+      if (cfg.mock) return sleep(150).then(function () { return { pris: ['09:45', '14:45'] }; });
       return req('GET', '/entretiens/creneaux?jour=' + encodeURIComponent(jour));
     },
     bookSlot: function (id, jour, heure) {
-      if (cfg.mock) return sleep(500).then(function () { mockUpdate(id, { entretien: heure }); return { ok: true }; });
+      if (cfg.mock) return sleep(500).then(function () { var d0 = mockList().find(function (d) { return d.id === id; }) || {}; var jours = (d0.jours_visite || []).slice(); if (jours.indexOf(jour) < 0) jours.push(jour); mockUpdate(id, { entretien: heure, entretien_jour: jour, jours_visite: jours.sort() }); return { ok: true }; });
       return req('POST', '/diagnostics/' + encodeURIComponent(id) + '/entretien', { jour: jour, heure: heure });
     },
     sendInvitation: function () {
