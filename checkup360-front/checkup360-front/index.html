@@ -27,7 +27,8 @@
 </button>
 <nav aria-label="Navigation principale" style="margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
 <button type="button" class="navbtn" onClick="{{openProgramme}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16"></path></svg>Programme</button>
-<button type="button" class="{{mesCls}}" onClick="{{openEspace}}" aria-current="{{mesCurrent}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Mes diagnostics<sc-if value="{{hasDiags}}" hint-placeholder-val="{{false}}"><span class="cnt">{{diagCount}}</span></sc-if></button>
+<button type="button" class="{{mesCls}}" data-son="{{sonNav}}" onClick="{{openEspace}}" aria-current="{{mesCurrent}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Mes diagnostics<sc-if value="{{hasDiags}}" hint-placeholder-val="{{false}}"><span class="cnt">{{diagCount}}</span></sc-if></button>
+<button type="button" class="navbtn" role="switch" aria-checked="{{sonCoche}}" aria-label="{{sonLabel}}" title="{{sonLabel}}" onClick="{{toggleSon}}" disabled="{{sonBloque}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"></path><sc-if value="{{sonActif}}"><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></sc-if><sc-if value="{{sonCoupe}}"><path d="M16 9.5l5 5M21 9.5l-5 5"></path></sc-if></svg></button>
 <sc-if value="{{headerCta}}" hint-placeholder-val="{{true}}"><button type="button" class="btn btn-a btn-sm" onClick="{{start}}" style="margin-left: 6px">Faire mon diagnostic</button></sc-if>
 <sc-if value="{{logged}}" hint-placeholder-val="{{false}}">
 <span style="display: inline-flex; align-items: center; gap: 8px; margin-left: 6px; padding-left: 12px; border-left: 1px solid #E0E0E0"><span class="avatar" aria-hidden="true">{{initials}}</span><span style="font-size: 12px; font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{userEmail}}</span></span>
@@ -180,7 +181,7 @@
 <sc-if value="{{show.auth}}" hint-placeholder-val="{{false}}">
 <div style="max-width: 1040px; margin: 0 auto; padding: 56px 24px 0; display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start">
 <div style="flex: 1 1 380px; min-width: 0" class="up">
-<button type="button" class="btn btn-t btn-sm" onClick="{{authBack}}" style="margin-left: -12px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>{{authBackL}}</button>
+<button type="button" class="btn btn-t btn-sm" data-son="clic" onClick="{{authBack}}" style="margin-left: -12px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>{{authBackL}}</button>
 <p class="micro" style="margin-top: 20px">{{authKicker}}</p>
 <h1 style="font-size: clamp(2rem, 3.6vw, 2.8rem); margin-top: 10px; font-family: Poppins, Sora, sans-serif; font-weight: 800">{{authTitle}}</h1>
 <p style="font-size: 17px; color: #525252; margin-top: 12px; max-width: 46ch">{{authLead}}</p>
@@ -372,7 +373,7 @@
 </sc-if>
 
 <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 20px; border-top: 1px solid #E0E0E0">
-<sc-if value="{{canBack}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-g" onClick="{{back}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>Précédent</button></sc-if>
+<sc-if value="{{canBack}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-g" data-son="clic" onClick="{{back}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>Précédent</button></sc-if>
 <sc-if value="{{noBack}}" hint-placeholder-val="{{true}}"><span class="hint">Tous les champs sont obligatoires sauf mention.</span></sc-if>
 <sc-if value="{{notLast}}" hint-placeholder-val="{{true}}"><button type="submit" class="btn btn-p btn-lg">Continuer<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
 <sc-if value="{{isLast}}" hint-placeholder-val="{{false}}"><button type="submit" class="btn btn-a btn-lg {{launchCls}}">Lancer mon diagnostic<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
@@ -473,7 +474,7 @@
 <div class="card glass up d2" style="padding: 22px; display: flex; flex-direction: column; gap: 10px">
 <p class="micro">Vous pouvez continuer la visite</p>
 <p style="font-size: 14px">Le rapport arrive par e-mail et se range dans « Mes diagnostics », où vous pouvez suivre l’analyse.</p>
-<button type="button" class="btn btn-g btn-sm" onClick="{{openEspace}}" style="align-self: flex-start">Aller à Mes diagnostics</button>
+<button type="button" class="btn btn-g btn-sm" data-son="clic" onClick="{{openEspace}}" style="align-self: flex-start">Aller à Mes diagnostics</button>
 </div>
 <div class="card up d3" style="padding: 22px; display: flex; flex-direction: column; gap: 12px">
 <p class="micro">Pendant l’attente</p>
@@ -537,9 +538,9 @@
 
 <section style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
 <button type="button" class="btn btn-a btn-lg {{dlCls}}" onClick="{{openReport}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>Voir le rapport</button>
-<button type="button" class="btn btn-g btn-lg" onClick="{{download}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"></path></svg>Télécharger le rapport</button>
-<button type="button" class="btn btn-p btn-lg" onClick="{{openSlot}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16"></path></svg>{{slotBtn}}</button>
-<button type="button" class="btn btn-g btn-lg" onClick="{{openEspace}}" style="margin-left: auto"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Mes diagnostics</button>
+<button type="button" class="btn btn-g btn-lg" data-son="clic" onClick="{{download}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"></path></svg>Télécharger le rapport</button>
+<button type="button" class="btn btn-p btn-lg" data-son="clic" onClick="{{openSlot}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16"></path></svg>{{slotBtn}}</button>
+<button type="button" class="btn btn-g btn-lg" data-son="clic" onClick="{{openEspace}}" style="margin-left: auto"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Mes diagnostics</button>
 </section>
 <p class="hint">Ce diagnostic ne constitue ni un audit, ni une certification des comptes, ni un avis juridique. Ce rapport est aussi rangé dans « Mes diagnostics ».</p>
 </div>
@@ -577,7 +578,7 @@
 <sc-if value="{{x.failed}}" hint-placeholder-val="{{false}}"><p style="font-size: 13px; margin-top: 4px; color: #DC2626">Documents illisibles : un conseiller vous rappelle.</p></sc-if>
 </div>
 <div style="display: flex; gap: 8px; flex-wrap: wrap">
-<sc-if value="{{x.done}}" hint-placeholder-val="{{true}}"><button type="button" class="btn btn-p btn-sm {{x.openCls}}" onClick="{{x.open}}">Ouvrir</button><button type="button" class="btn btn-g btn-sm" onClick="{{x.download}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"></path></svg>Rapport</button></sc-if>
+<sc-if value="{{x.done}}" hint-placeholder-val="{{true}}"><button type="button" class="btn btn-p btn-sm {{x.openCls}}" onClick="{{x.open}}">Ouvrir</button><button type="button" class="btn btn-g btn-sm" data-son="clic" onClick="{{x.download}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"></path></svg>Rapport</button></sc-if>
 <sc-if value="{{x.running}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-g btn-sm" onClick="{{x.follow}}">Suivre en direct</button></sc-if>
 <sc-if value="{{x.failed}}" hint-placeholder-val="{{false}}"><button type="button" class="btn btn-g btn-sm" onClick="{{start}}">Redéposer</button></sc-if>
 </div>
@@ -625,8 +626,8 @@
 
 <section class="card up d2" style="padding: 20px; display: flex; flex-direction: column; gap: 10px" aria-labelledby="h-ent">
 <p class="micro" id="h-ent">Mon entretien</p>
-<sc-if value="{{hasSlot}}" hint-placeholder-val="{{false}}"><p style="font-size: 15px"><b>{{slotL}}</b><br><span class="muted" style="font-size: 13px">20 minutes avec un conseiller, votre rapport en main.</span></p><button type="button" class="btn btn-g btn-sm" onClick="{{openSlot}}" style="align-self: flex-start">Changer de créneau</button></sc-if>
-<sc-if value="{{noSlot}}" hint-placeholder-val="{{true}}"><p style="font-size: 14px" class="muted">Réservez 20 minutes avec un conseiller pour passer votre plan d’action en revue.</p><button type="button" class="btn btn-p btn-sm" onClick="{{openSlot}}" style="align-self: flex-start" disabled="{{noDoneDiag}}">Réserver un créneau</button></sc-if>
+<sc-if value="{{hasSlot}}" hint-placeholder-val="{{false}}"><p style="font-size: 15px"><b>{{slotL}}</b><br><span class="muted" style="font-size: 13px">20 minutes avec un conseiller, votre rapport en main.</span></p><button type="button" class="btn btn-g btn-sm" data-son="clic" onClick="{{openSlot}}" style="align-self: flex-start">Changer de créneau</button></sc-if>
+<sc-if value="{{noSlot}}" hint-placeholder-val="{{true}}"><p style="font-size: 14px" class="muted">Réservez 20 minutes avec un conseiller pour passer votre plan d’action en revue.</p><button type="button" class="btn btn-p btn-sm" data-son="clic" onClick="{{openSlot}}" style="align-self: flex-start" disabled="{{noDoneDiag}}">Réserver un créneau</button></sc-if>
 </section>
 
 <section class="card up d3 dk" style="padding: 20px; display: flex; flex-direction: column; gap: 8px; background: #000000; color: #FFFFFF; border-color: #000000">
@@ -792,7 +793,8 @@
 <script src="assets/js/dc-runtime.js"></script>
 <script src="assets/js/vendor/supabase.js"></script>
 <script src="assets/js/api.js"></script>
+<script src="assets/js/sons.js"></script>
 <script src="assets/js/app-visiteur.js"></script>
-<script>DC.mount(Component, 'tpl-visiteur', document.getElementById('app'), DC.queryProps());</script>
+<script>Sons.init(); DC.mount(Component, 'tpl-visiteur', document.getElementById('app'), DC.queryProps());</script>
 </body>
 </html>

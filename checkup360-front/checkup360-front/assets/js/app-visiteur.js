@@ -150,6 +150,7 @@ class Component extends DCLogic {
     API.verifyCode(a.email.trim(), a.code).then((sess) => {
       const intent = this.state.auth.intent;
       this.setState((s) => ({ user: { email: sess.email }, auth: { ...s.auth, busy: false } }));
+      Sons.jouer('code_ok');
       this.toast('ok', 'Connexion réussie', intent === 'diag' ? 'Commençons votre diagnostic.' : 'Bienvenue dans Mes diagnostics.');
       if (intent === 'diag') this.newDiag(); else this.setState({ screen: 'espace' });
       this.refreshDiags();
@@ -193,8 +194,8 @@ class Component extends DCLogic {
   next() {
     const e = this.validate(this.state.step);
     const n = Object.keys(e).length;
-    if (n) { this.setState({ err: e }); this.toast('bad', 'Il manque une réponse', n > 1 ? n + ' éléments à compléter.' : '1 élément à compléter.'); return; }
-    if (this.state.step < 6) this.setState((s) => ({ step: s.step + 1, err: {} }));
+    if (n) { Sons.jouer('erreur'); this.setState({ err: e }); this.toast('bad', 'Il manque une réponse', n > 1 ? n + ' éléments à compléter.' : '1 élément à compléter.'); return; }
+    if (this.state.step < 6) { Sons.jouer('etape', { rang: this.state.step }); this.setState((s) => ({ step: s.step + 1, err: {} })); }
     else this.launch();
   }
   /* Case « Autre document » : plusieurs fichiers (sélection multiple ou glisser-déposer) */
@@ -207,15 +208,16 @@ class Component extends DCLogic {
     if (!fl) return;
     const MAX = this.K.MAX_FILES;
     const ext = (fl.name.split('.').pop() || '').toLowerCase();
-    if (!['csv', 'xlsx', 'pdf'].includes(ext)) { this.toast('bad', 'Format non accepté', fl.name + ' : CSV, XLSX ou PDF uniquement.'); this.setState({ dragSlot: null }); return; }
-    if (fl.size > 20 * 1024 * 1024) { this.toast('bad', 'Fichier trop lourd', fl.name + ' dépasse 20 Mo.'); this.setState({ dragSlot: null }); return; }
+    if (!['csv', 'xlsx', 'pdf'].includes(ext)) { Sons.jouer('erreur'); this.toast('bad', 'Format non accepté', fl.name + ' : CSV, XLSX ou PDF uniquement.'); this.setState({ dragSlot: null }); return; }
+    if (fl.size > 20 * 1024 * 1024) { Sons.jouer('erreur'); this.toast('bad', 'Fichier trop lourd', fl.name + ' dépasse 20 Mo.'); this.setState({ dragSlot: null }); return; }
     const files = { ...this.state.files };
-    if (!files[slot] && Object.keys(files).length >= MAX) { this.toast('bad', 'Maximum atteint', MAX + ' fichiers par diagnostic.'); this.setState({ dragSlot: null }); return; }
+    if (!files[slot] && Object.keys(files).length >= MAX) { Sons.jouer('erreur'); this.toast('bad', 'Maximum atteint', MAX + ' fichiers par diagnostic.'); this.setState({ dragSlot: null }); return; }
     if (Object.values(files).some((x) => x.name === fl.name && x.size === fl.size)) { this.toast('info', 'Déjà ajouté', fl.name); this.setState({ dragSlot: null }); return; }
     files[slot] = { name: fl.name, size: fl.size, ext };
     this.fileObjs[slot] = fl;
     this.state.files = files; // plusieurs ajouts dans le même tour (sélection multiple)
     this.setState((s) => ({ files, dragSlot: null, err: { ...s.err, files: null } }));
+    Sons.jouer('fichier_ok');
     this.toast('ok', 'Fichier ajouté', fl.name);
   }
   payload() {
@@ -232,6 +234,7 @@ class Component extends DCLogic {
   }
   launch() {
     if (this.state.busy) return;
+    Sons.jouer('lancer');
     this.setState({ busy: true });
     let files = this.fileObjs;
     if (API.config.mock && !Object.keys(files).length) files = {};
@@ -255,6 +258,7 @@ class Component extends DCLogic {
     const iv = setInterval(() => { if (!this.state.failed && !this.state.done) this.setState({ elapsed: Date.now() - start }); }, 250);
     this.timers.push(iv);
     const t0 = () => this.fmtT((Date.now() - start) / 1000);
+    let rangSon = 0; // un son par étape majeure : Lecture, Analyse, Calcul, Rapport
     this.unsub = API.subscribe(id, (ev) => {
       const kind = ev.niveau === 'erreur' || ev.etape === 'ERREUR' ? 'bad' : ev.niveau === 'ok' || ev.etape === 'ENVOYE' ? 'ok' : '';
       this.setState((s) => {
@@ -263,7 +267,10 @@ class Component extends DCLogic {
         if (this.K.ETAPE[ev.etape] != null) patch.stage = Math.max(s.stage, this.K.ETAPE[ev.etape]);
         return patch;
       });
+      const idx = this.K.ETAPE[ev.etape];
+      if (idx != null && idx <= 3 && idx >= rangSon && this.state.screen === 'suivi') { rangSon = idx + 1; Sons.jouer('etape_calcul', { rang: rangSon }); }
       if (ev.etape === 'ERREUR') {
+        Sons.jouer('echec');
         this.setState({ failed: true, failMsg: ev.message || '' });
         this.toast('bad', 'Diagnostic interrompu', 'Un conseiller va vous rappeler.');
         this.refreshDiags();
@@ -271,7 +278,7 @@ class Component extends DCLogic {
       if (ev.etape === 'ENVOYE') {
         this.setState({ done: true, pct: 100, stage: 5 });
         API.getDiagnostic(id).then((d) => {
-          this.later(() => { this.setState({ screen: 'resultat', result: d, confetti: true, slot: d && d.entretien }); this.finish(d); }, 900);
+          this.later(() => { Sons.jouer('pret'); this.setState({ screen: 'resultat', result: d, confetti: true, slot: d && d.entretien }); this.finish(d); }, 900);
           this.refreshDiags();
         }).catch((e) => this.fail(e, 'Résultat indisponible'));
       }
@@ -420,6 +427,10 @@ class Component extends DCLogic {
       jourL: K.JOURL[f.jour] || '', noPick: !s.slotPick, noDoneDiag: doneDiags.length === 0,
       launchCls: s.busy ? 'loading' : '', dlCls: s.dl ? 'loading' : '',
       quitTitle: 'Quitter le diagnostic ?', quitText: 'Votre brouillon est conservé sur cet appareil : vous pourrez reprendre plus tard depuis l’accueil.', quitBtn: 'Quitter',
+      sonCoche: Sons.estMuet() ? 'false' : 'true', sonCoupe: Sons.estMuet(), sonActif: !Sons.estMuet(), sonBloque: Sons.estBloque(),
+      sonLabel: Sons.estMuet() ? 'Son désactivé' : 'Son activé',
+      toggleSon: () => { Sons.basculerMuet(); this.forceUpdate(); },
+      sonNav: s.screen === 'accueil' ? undefined : 'clic', // aucun son sur la page d'accueil
       logged: !!s.user, headerCta: !s.user && (s.screen === 'accueil'), userEmail, initials: (firstName || userEmail || '?').slice(0, 2).toUpperCase(), firstName: firstName || 'et bienvenue',
       mesCls: s.screen === 'espace' ? 'navbtn on' : 'navbtn', mesCurrent: s.screen === 'espace' ? 'page' : undefined,
       hasDiags: s.diags.length > 0, noDiags: s.diags.length === 0 && !s.diagsLoading, diagsLoading: s.diagsLoading && !s.diags.length, diagCount: s.diags.length, diagCountL: s.diags.length ? s.diags.length + ' diagnostic' + (s.diags.length > 1 ? 's' : '') + ' · conservés 30 jours' : 'Aucun pour l’instant', diagRows,
@@ -483,7 +494,7 @@ class Component extends DCLogic {
       openSlot: () => this.openSlotFor(s.jobId || (doneDiags[0] && doneDiags[0].id)),
       confirmSlot: () => {
         const t = s.slotPick, id = s.slotDiag || s.jobId || (doneDiags[0] && doneDiags[0].id);
-        API.bookSlot(id, f.jour, t).then(() => { this.setState({ slot: t, modal: null }); this.toast('ok', 'Entretien confirmé', label(K.JOUR, f.jour) + ' à ' + t); this.refreshDiags(); }).catch((e) => this.fail(e, 'Réservation impossible'));
+        API.bookSlot(id, f.jour, t).then(() => { Sons.jouer('rdv_ok'); this.setState({ slot: t, modal: null }); this.toast('ok', 'Entretien confirmé', label(K.JOUR, f.jour) + ' à ' + t); this.refreshDiags(); }).catch((e) => this.fail(e, 'Réservation impossible'));
       },
       askRestart: () => this.newDiag()
     };
