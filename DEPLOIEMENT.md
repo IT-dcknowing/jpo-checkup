@@ -127,6 +127,11 @@ e-mail n'est envoyé sauf `EMAILS_PREVIEW=1`.
 *Vercel > Deployments* : *Promote to Production* sur le déploiement précédent (instantané). Une migration ne s'annule
 pas : restaurer la sauvegarde prise juste avant (§6) si elle doit être défaite.
 
+> **Choix en vigueur (26/11/2026)** : modèles gratuits et mots de passe conseillers actuels conservés. Les paragraphes
+> ci-dessus décrivant leur refus ne s'appliquent que si `AUTORISER_MODELES_GRATUITS=0` ou `MOTS_DE_PASSE_CLAIR=0`
+> sont définis dans Vercel. La notice du site annonce que les fournisseurs des modèles gratuits peuvent conserver les
+> données : la corriger si l'on passe aux modèles payants.
+
 ## 5. Développement local
 ```bash
 npm install                      # dépendances du rendu Word (racine)

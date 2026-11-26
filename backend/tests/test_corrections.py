@@ -236,6 +236,7 @@ def test_mot_de_passe_hache_et_totp(settings):
 
 
 def test_mot_de_passe_en_clair_refuse_en_production(settings):
+    settings.mots_de_passe_clair = False
     c = _app_admin(settings, {"a@dc-knowing.ci": {"secret": "en-clair", "totp": "", "role": "conseiller"}}, production=True)
     assert c.post("/api/admin/login", json={"email": "a@dc-knowing.ci", "password": "en-clair"}).status_code == 401
 
@@ -302,13 +303,31 @@ def test_docs_masquees_en_production(settings):
 def test_ia_avec_collecte_refusee_en_production(settings):
     settings.production, settings.openrouter_api_key = True, "k"
     settings.llm_data_collection, settings.llm_models = "allow", ["x/y:free"]
+    settings.autoriser_modeles_gratuits = False
     assert len(settings.problemes_ia()) == 2
     with pytest.raises(LLMAuthError, match="refusée en production"):
         OpenRouterClient(settings).complete_validated("s", "u", lambda d: d)
 
 
-def test_collecte_refusee_par_defaut(settings):
-    assert settings.llm_data_collection == "deny" and settings.llm_budget == 170 and settings.llm_timeout == 75
+def test_modeles_gratuits_autorises_par_defaut(settings):
+    assert settings.llm_data_collection == "allow" and settings.blocages_ia() == [] and settings.problemes_ia()
+    assert settings.llm_budget == 170 and settings.llm_timeout == 75
+
+
+def test_collecte_refusee_sans_modele_gratuit(monkeypatch, tmp_path):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("OPENROUTER_MODELS", "fournisseur/modele-payant")
+    monkeypatch.delenv("OPENROUTER_DATA_COLLECTION", raising=False)
+    assert Settings().llm_data_collection == "deny"
+
+
+def test_mot_de_passe_en_clair_avec_virgule_accepte_en_production(settings, monkeypatch, tmp_path):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("ADMIN_ACCOUNTS", "a@dc-knowing.ci=Mot,de passe!")
+    comptes = Settings().admin_accounts
+    assert comptes["a@dc-knowing.ci"]["secret"] == "Mot,de passe!"
+    c = _app_admin(settings, comptes, production=True)
+    assert c.post("/api/admin/login", json={"email": "a@dc-knowing.ci", "password": "Mot,de passe!"}).status_code == 200
 
 
 # ------------------------------------------------------------------ R-20 : fichiers piégés

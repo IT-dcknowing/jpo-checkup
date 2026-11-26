@@ -130,8 +130,8 @@ class OpenRouterClient:
     def complete_validated(self, system: str, user: str, validate: Callable[[dict], T]) -> tuple[T, str]:
         if not self.s.openrouter_api_key:
             raise LLMAuthError("OPENROUTER_API_KEY n'est pas renseignée (fichier backend/.env)")
-        if self.s.production and (pb := self.s.problemes_ia()):
-            # notice ARTCI : « prestataire IA configuré sans collecte » ; aucun envoi tant que ce n'est pas vrai
+        if self.s.production and (pb := self.s.blocages_ia()):
+            # AUTORISER_MODELES_GRATUITS=0 : aucun envoi à un fournisseur qui conserverait les données
             raise LLMAuthError("configuration IA refusée en production : " + " ; ".join(pb))
         errors: list[str] = []
         debut = time.monotonic()

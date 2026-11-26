@@ -96,11 +96,12 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
     if s.production and (pb := s.problemes_config()):
         # refuser de démarrer plutôt que de tourner à moitié (rendus Word en 401, purge désactivée, jetons incohérents)
         raise RuntimeError("Configuration de production incomplète : " + " ; ".join(pb))
-    if s.production and (pb := s.problemes_ia()):
+    if s.production and (pb := s.blocages_ia()):
         log.error("IA désactivée en production tant que : %s", " ; ".join(pb))
     for user, acc in s.admin_accounts.items():
         if not is_hashed(acc["secret"]):
-            log.warning("compte conseiller %s : mot de passe en clair%s", user, " — refusé en production" if s.production else "")
+            refus = " — refusé en production" if s.production and not s.mots_de_passe_clair else ""
+            log.warning("compte conseiller %s : mot de passe en clair%s", user, refus)
     s.ensure_dirs()
     if s.sentry_dsn:
         try:
@@ -155,7 +156,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
 
     def account(user: str) -> dict | None:
         acc = s.admin_accounts.get(user)
-        if not acc or (s.production and not is_hashed(acc["secret"])):
+        if not acc or (s.production and not s.mots_de_passe_clair and not is_hashed(acc["secret"])):
             return None
         return acc
 
@@ -233,7 +234,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
                 checks["base"] = True
             except Exception:  # noqa: BLE001
                 checks["base"] = False
-        ok = checks["configuration"] and checks.get("base", True) is not False and (checks["ia_conforme"] or not s.production)
+        ok = checks["configuration"] and checks.get("base", True) is not False and (not s.blocages_ia() or not s.production)
         detail = {"ok": ok, "checks": checks}
         if not s.production:  # en production, le détail des réglages manquants reste dans les journaux
             detail["problemes"] = s.problemes_config() + s.problemes_ia()
@@ -486,7 +487,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, s
         password = str(payload.get("password", ""))
         acc = account(user)
         if acc:
-            ok = verify_password(password, acc["secret"], allow_plain=not s.production)
+            ok = verify_password(password, acc["secret"], allow_plain=s.mots_de_passe_clair or not s.production)
         else:
             dummy_password_check(password)
             ok = False

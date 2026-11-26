@@ -64,7 +64,7 @@ rémunérations nominatives (données à caractère personnel de salariés) : le
 |---|---|---|---|---|
 | Supabase Inc. | Base de données, fichiers, comptes, envoi des codes | Toutes | *(région du projet — à vérifier : Project Settings > General)* | DPA signé, chiffrement au repos |
 | Vercel Inc. | Exécution de l'application | Transitoires (traitement) | Région `dub1` (Dublin, UE) | DPA |
-| OpenRouter + fournisseur du modèle | Extraction des chiffres par IA | Texte pseudonymisé des documents (sans identifiants du visiteur ni noms des tiers des tableaux) | États-Unis / selon fournisseur | Collecte refusée (`data_collection=deny`), DPA, modèles payants sans conservation |
+| OpenRouter + fournisseur du modèle | Extraction des chiffres par IA | Texte pseudonymisé des documents (sans identifiants du visiteur ni noms des tiers des tableaux) | États-Unis / selon fournisseur | **Situation actuelle : modèles gratuits, collecte autorisée (`data_collection=allow`)**, annoncée dans la notice ; à valider par un juriste. Cible : modèles payants sans conservation, `deny`, DPA |
 | Resend | Envoi des e-mails | E-mail, nom, scores, lien du rapport, pièce jointe Word | États-Unis / UE | DPA |
 | Sentry (si activé) | Erreurs techniques | Traces sans données personnelles (`send_default_pii=False`) | UE / États-Unis | DPA |
 

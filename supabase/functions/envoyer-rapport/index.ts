@@ -52,6 +52,24 @@ function egal(a: string, b: string): boolean {
   return r === 0;
 }
 
+// Clé serveur d'un autre format que celle de la fonction (eyJ... / sb_secret_...) : seule une clé serveur ouvre
+// l'API d'administration des comptes ; un jeton de visiteur ou la clé publique y sont refusés.
+async function estCleServeur(jeton: string): Promise<boolean> {
+  let role = "";
+  try {
+    role = JSON.parse(atob(jeton.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).role;
+  } catch (_) { /* pas un JWT */ }
+  if (!jeton.startsWith("sb_secret_") && role !== "service_role") return false;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1`, {
+      headers: { apikey: jeton, Authorization: `Bearer ${jeton}` },
+    });
+    return r.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
 // Gabarit sobre aux couleurs de l'app (noir, or #FFD700), styles en ligne pour les messageries
 function page(paras: string[], bouton?: [string, string], pied = ""): string {
   const p = paras.map((x) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.55">${x}</p>`).join("");
@@ -106,7 +124,8 @@ Deno.serve(async (req) => {
   // ---------------------------------------------------------------- qui appelle ?
   const jeton = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!jeton) return json(401, { error: "Authentification requise" });
-  const serveur = egal(jeton, SERVICE_KEY) || (INTERNE !== "" && egal(req.headers.get("x-cle-interne") ?? "", INTERNE));
+  const serveur = egal(jeton, SERVICE_KEY) || (INTERNE !== "" && egal(req.headers.get("x-cle-interne") ?? "", INTERNE)) ||
+    await estCleServeur(jeton);
   let user: { id: string; email?: string } | null = null;
   if (!serveur) {
     const { data, error } = await admin.auth.getUser(jeton);

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import shutil
 from functools import lru_cache
@@ -16,8 +17,9 @@ load_dotenv(PROJECT_DIR / ".env")
 load_dotenv(BACKEND_DIR / ".env")
 
 # Ordre de repli : si le premier modèle échoue, on passe au suivant.
-# Modèles gratuits (« :free ») : développement uniquement. OpenRouter n'y accepte que la collecte des données
-# (« data_collection=allow ») ; ils sont donc refusés en production (voir Settings.problemes_ia).
+# Modèles gratuits (« :free ») : OpenRouter n'y accepte que la collecte des données (« data_collection=allow »).
+# Autorisés aussi en production par choix du cabinet (la notice du site le dit) ; AUTORISER_MODELES_GRATUITS=0
+# les refuse de nouveau.
 DEFAULT_MODELS = [
     "nvidia/nemotron-3.5-lightning:free",
     "baidu/ernie-5.5-flash-preview:free",
@@ -113,8 +115,11 @@ class Settings:
         self.llm_budget = _float("LLM_BUDGET", 170)
         self.llm_backoff = [float(x) for x in _csv("LLM_BACKOFF", ["2", "6", "18"])]
         self.llm_max_tokens = _int("LLM_MAX_TOKENS", 8000)
-        # « deny » : OpenRouter n'utilise que des fournisseurs qui ne conservent pas les données (notice ARTCI).
-        self.llm_data_collection = e("OPENROUTER_DATA_COLLECTION", "deny").strip().lower()
+        # « deny » : OpenRouter n'utilise que des fournisseurs qui ne conservent pas les données. Les modèles gratuits
+        # exigent « allow » : valeur par défaut tant qu'ils sont autorisés et configurés.
+        self.autoriser_modeles_gratuits = e("AUTORISER_MODELES_GRATUITS", "1").strip() != "0"
+        gratuit = self.autoriser_modeles_gratuits and any(m.endswith(":free") for m in self.llm_models)
+        self.llm_data_collection = e("OPENROUTER_DATA_COLLECTION", "allow" if gratuit else "deny").strip().lower()
         self.context_max_chars = _int("CONTEXT_MAX_CHARS", 60_000)
 
         # Dépôts
@@ -161,7 +166,8 @@ class Settings:
         if not self.secret_key and not self.production:
             self.secret_key = _persisted(self.data_dir / ".secret_key", lambda: secrets.token_urlsafe(48))
         # Comptes conseillers : ADMIN_ACCOUNTS="a@x.ci=<empreinte>,totp=<clé base32>,role=lecture;b@x.ci=<empreinte>"
-        # <empreinte> : python -m app.security hash (scrypt). Les mots de passe en clair ne sont acceptés qu'hors production.
+        # <empreinte> : python -m app.security hash (scrypt). Un mot de passe en clair reste accepté, y compris en
+        # production, tant que MOTS_DE_PASSE_CLAIR n'est pas à 0.
         # Rôles : « conseiller » (défaut, toutes les actions) ou « lecture » (consultation seule, ni export ni envoi).
         self.admin_accounts: dict[str, dict] = {}
         if e("ADMIN_PASSWORD"):
@@ -170,11 +176,13 @@ class Settings:
             user, sep, rest = pair.partition("=")
             if not (sep and user.strip() and rest):
                 continue
-            secret, *opts = rest.split(",")
+            # seules « ,totp= » et « ,role= » sont des options : un mot de passe peut contenir des virgules
+            secret, *opts = re.split(r",(?=(?:totp|role)=)", rest)
             o = dict(x.split("=", 1) for x in opts if "=" in x)
             role = o.get("role", "conseiller").strip().lower()
             self.admin_accounts[user.strip().lower()] = {"secret": secret.strip(), "totp": o.get("totp", "").strip().replace(" ", "").upper(),
                                                          "role": role if role in ("conseiller", "lecture") else "lecture"}
+        self.mots_de_passe_clair = e("MOTS_DE_PASSE_CLAIR", "1").strip() != "0"
         self.admin_token_ttl = _int("ADMIN_TOKEN_HOURS", 4) * 3600
         # Changer ADMIN_TOKEN_VERSION révoque d'un coup tous les jetons conseillers en cours
         self.admin_token_version = e("ADMIN_TOKEN_VERSION", "1").strip()
@@ -203,7 +211,7 @@ class Settings:
         self.lo_warmup = e("LO_WARMUP", "1") == "1"
 
     def problemes_ia(self) -> list[str]:
-        """Réglages IA incompatibles avec la notice (« sans collecte ») : bloquants en production."""
+        """Réglages IA qui permettent la conservation des données par le fournisseur (signalés par /api/health)."""
         out = []
         if self.llm_data_collection != "deny":
             out.append("OPENROUTER_DATA_COLLECTION doit valoir « deny »")
@@ -211,6 +219,10 @@ class Settings:
         if gratuits:
             out.append("modèles gratuits (collecte imposée) : " + ", ".join(gratuits))
         return out
+
+    def blocages_ia(self) -> list[str]:
+        """Problèmes IA qui interdisent l'envoi en production (aucun si les modèles gratuits sont autorisés)."""
+        return [] if self.autoriser_modeles_gratuits else self.problemes_ia()
 
     def problemes_config(self) -> list[str]:
         """Secrets et réglages indispensables en production (l'API refuse de démarrer sans eux)."""
