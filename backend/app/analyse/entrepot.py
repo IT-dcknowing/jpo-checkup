@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import re
 import threading
-from bisect import bisect_left
 from dataclasses import replace
 from functools import lru_cache
 import time
@@ -576,33 +575,38 @@ class Entrepot:
         for l in lignes:
             l["virement_interne"] = False
 
-        def lies(a: dict, b: dict) -> bool:
-            if a["categorie_libelle"] == "virement_interne" or b["categorie_libelle"] == "virement_interne":
-                return True
-            return any(a["src"] in g and b["src"] in g for g in groupes)
+        paires = {(a, b) for g in groupes for a in g for b in g}
 
-        # contreparties possibles : toute entrée datée (la contrepartie peut ne pas être catégorisée)
-        entrees: dict[int, list[dict]] = {}
+        def lies(a: dict, b: dict) -> bool:
+            return (a["categorie_libelle"] == "virement_interne" or b["categorie_libelle"] == "virement_interne"
+                    or (a["src"], b["src"]) in paires)
+
+        # contreparties possibles : toute entrée datée (la contrepartie peut ne pas être catégorisée), indexées
+        # par (montant arrondi, jour) puis par compte ; une entrée appariée est retirée de l'index
+        index: dict[tuple[int, date], dict[str, list[dict]]] = {}
         for l in lignes:
             if l["entree"] and l["date"] is not None:
-                entrees.setdefault(round(l["entree"]), []).append(l)
-        apparies: set[int] = set()
-        sorties = sorted((l for l in lignes if l["sortie"] and l["date"] is not None), key=lambda l: (l["date"], l["src"], l["ligne"]))
-        for s in sorties:
+                index.setdefault((round(l["entree"]), l["date"]), {}).setdefault(l["compte"], []).append(l)
+        sorties = sorted((l for l in lignes if l["sortie"] and l["date"] is not None),
+                         key=lambda l: (l["date"], l["src"], l["ligne"]))
+        def contrepartie(s: dict) -> tuple[list, int] | None:
+            """(liste, position) de l'entrée appariable la plus proche en date, sinon None."""
             cible = round(s["sortie"])
-            meilleur = None
-            for k in (cible - 1, cible, cible + 1):
-                for e in entrees.get(k, []):
-                    if id(e) in apparies or e["compte"] == s["compte"] or not lies(s, e):
-                        continue
-                    if abs(e["entree"] - s["sortie"]) > TOLERANCE_VIREMENT:
-                        continue
-                    ecart = abs((e["date"] - s["date"]).days)
-                    if ecart <= FENETRE_VIREMENT and (meilleur is None or ecart < meilleur[0]):
-                        meilleur = (ecart, e)
-            if meilleur is not None:
-                e = meilleur[1]
-                apparies.update((id(e), id(s)))
+            for ecart in range(FENETRE_VIREMENT + 1):
+                for jour in dict.fromkeys((s["date"] - timedelta(days=ecart), s["date"] + timedelta(days=ecart))):
+                    for k in (cible - 1, cible, cible + 1):
+                        for compte, lst in index.get((k, jour), {}).items():
+                            if compte == s["compte"]:
+                                continue
+                            for pos, e in enumerate(lst):
+                                if abs(e["entree"] - s["sortie"]) <= TOLERANCE_VIREMENT and lies(s, e):
+                                    return lst, pos
+            return None
+
+        for s in sorties:
+            trouve = contrepartie(s)
+            if trouve is not None:
+                e = trouve[0].pop(trouve[1])
                 e["virement_interne"] = s["virement_interne"] = True
         for l in lignes:
             if l["categorie_libelle"] == "virement_interne" and not l["virement_interne"]:
